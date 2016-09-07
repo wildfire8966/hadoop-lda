@@ -1,14 +1,18 @@
 package com.weibo.ml.lda;
 
 import com.weibo.misc.Flags;
+import com.weibo.tool.FolderReader;
 import com.weibo.tool.GenericTool;
 import org.apache.hadoop.fs.FileStatus;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.fs.PathFilter;
+import org.apache.hadoop.io.IntWritable;
+import org.apache.hadoop.io.Text;
 import org.apache.hadoop.mapred.JobConf;
 
 import java.io.DataOutputStream;
+import java.io.IOException;
 import java.io.OutputStreamWriter;
 import java.text.DecimalFormat;
 import java.text.NumberFormat;
@@ -30,7 +34,7 @@ public class LdaTrainer implements GenericTool {
         //必须参数
         flags.add("input", "input documents, each is space-separated words.");
         flags.add("output", "the final model, a plain text file.");
-        flags.add("workingDir", "temporary directory to hold intermediate files.");
+        flags.add("working_dir", "temporary directory to hold intermediate files.");
         flags.add("num_topics", "number of topics");
         flags.add("num_iterations", "number of iterations.");
 
@@ -46,7 +50,7 @@ public class LdaTrainer implements GenericTool {
 
         Path input = new Path(flags.getString("input"));
         Path output = new Path(flags.getString("output"));
-        Path workingDir = new Path(flags.getString("workingDir"));
+        Path workingDir = new Path(flags.getString("working_dir"));
         int numTopics = flags.getInt("num_topics");
         int numIterations = flags.getInt("num_iterations");
         double alpha = flags.getDouble("alpha");
@@ -132,13 +136,29 @@ public class LdaTrainer implements GenericTool {
             input = seqFileInput;
             logAndShow("Text input converted to SequenceFile.");
         }
-        // 2.
+        // 2. 初始化参数及模型
         if (latest == -1) {
             initializer.makeWordList(input, tfdf);
+            numWords = initializer.selectWords(tfdf, words, maxNumWords, minDf);
+            initializer.initModel(input, docs0, nwz0, words, numTopics, numWords);
+        } else {
+            numWords = loadNumWords(words);
         }
 
 
 
+    }
+
+    private int loadNumWords(Path words) throws IOException {
+        FolderReader reader = new FolderReader(words);
+        int numWords = 0;
+        Text key = new Text();
+        IntWritable value = new IntWritable();
+        while (reader.next(key, value)) {
+            numWords++;
+        }
+        reader.close();
+        return numWords;
     }
 
     private void logAndShow(String s) {

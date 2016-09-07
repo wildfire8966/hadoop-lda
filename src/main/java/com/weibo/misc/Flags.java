@@ -11,7 +11,9 @@ import java.util.Map;
 
 /**
  * 工具类：参数解析、检查与输出帮助信息
- * 注：采用标准可移植接口方式，所有参数均以字符串对待
+ * 注：
+ * 1. 采用标准可移植接口方式，所有参数均以字符串对待
+ * 2. Options只用来约束检查参数和暂时存放，实际参数存于optionValues中
  * Created by yuanye8 on 16/9/2.
  */
 public class Flags {
@@ -109,7 +111,7 @@ public class Flags {
      */
     private void printHelp() {
         HelpFormatter formatter = new HelpFormatter();
-        formatter.printHelp(" ", this.options);
+        formatter.printHelp("hadoop-lda-model-jar", this.options);
     }
 
     public int getInt(String name) {
