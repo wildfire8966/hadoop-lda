@@ -15,6 +15,7 @@ import java.io.IOException;
  * Created by yuanye8 on 16/9/5.
  */
 public class PlainTextToSeqFileTool implements GenericTool {
+    //单测使用
     public void run(String[] args) throws Exception {
         Flags flags = new Flags();
         flags.add("input");
@@ -51,7 +52,6 @@ public class PlainTextToSeqFileTool implements GenericTool {
 
     public static class ConvertMapper implements Mapper<LongWritable, Text, Text, Text> {
         Text outkey = new Text();
-        Text outvalue = new Text();
 
         public void map(LongWritable key, Text value, OutputCollector<Text, Text> outputCollector, Reporter reporter) throws IOException {
             this.outkey.set(Long.toString(key.get()));

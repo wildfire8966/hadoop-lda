@@ -55,6 +55,15 @@ public class InitModelTool implements GenericTool {
 
     }
 
+    /**
+     * 处理结果均已文本格式写在HDFS上，可以直接使用hadoop cat命令查看
+     * @param tfdf  输入：词频文件路径
+     * @param wordlist  输出：词权重，格式为 "word weight"
+     * @param maxNumWords 输入：设定的允许最大词数
+     * @param minDf 输入：设定的某个词存在于各文档中的文档的个数，用于过滤低质量词
+     * @return 所有语料的词汇集合的大小
+     * @throws IOException
+     */
     public int selectWords(Path tfdf, Path wordlist, int maxNumWords, int minDf) throws IOException {
         Map<String, WordFreq> wordCounts = loadWordFreq(tfdf);
         List<String> specialKeys = new LinkedList<String>();
@@ -64,13 +73,17 @@ public class InitModelTool implements GenericTool {
         }
 
         List<AnyDoublePair<String>> weights = new ArrayList<AnyDoublePair<String>>();
-
+        //特殊词汇含义不清，可能为遗留问题
         for (Map.Entry<String, WordFreq> e : wordCounts.entrySet()) {
             if (e.getKey().startsWith("_")) {
                 specialKeys.add(e.getKey());
             } else if (!e.getKey().equals(WordListMapper.NUM_DOCS_STRING)) {
                 WordFreq wf = e.getValue();
                 if (wf.df > minDf) {
+                    /**
+                     * 一个词出现的次数越多，且属于的文档越少，表明这个词区分度越大
+                     * 因此具有的价值越大，权值就越高
+                     */
                     double weight = wf.tf / total.tf * Math.log(total.df / wf.df);
                     weights.add(new AnyDoublePair<String>(e.getKey(), weight));
                 }
@@ -78,6 +91,10 @@ public class InitModelTool implements GenericTool {
         }
         Collections.sort(weights, new Comparator<AnyDoublePair<String>>() {
             public int compare(AnyDoublePair<String> o1, AnyDoublePair<String> o2) {
+                /**
+                 * 若o1在前，为升序排列
+                 * 若o2在前，为降序排列
+                 */
                 return Double.compare(o2.second, o1.second);
             }
         });

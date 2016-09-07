@@ -145,8 +145,6 @@ public class LdaTrainer implements GenericTool {
             numWords = loadNumWords(words);
         }
 
-
-
     }
 
     private int loadNumWords(Path words) throws IOException {
