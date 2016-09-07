@@ -1,22 +1,34 @@
 package com.weibo.ml.lda;
 
 import com.weibo.mapred.MapReduceJobConf;
+import com.weibo.misc.AnyDoublePair;
 import com.weibo.misc.Flags;
+import com.weibo.tool.FolderReader;
+import com.weibo.tool.FolderWriter;
 import com.weibo.tool.GenericTool;
+import org.apache.hadoop.fs.FSDataInputStream;
+import org.apache.hadoop.fs.FSDataOutputStream;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
+import org.apache.hadoop.io.IntWritable;
 import org.apache.hadoop.io.Text;
+import org.apache.hadoop.io.compress.DoNotPool;
 import org.apache.hadoop.mapred.JobClient;
 import org.apache.hadoop.mapred.JobConf;
 import org.apache.hadoop.mapred.SequenceFileOutputFormat;
+import org.apache.hadoop.mapred.lib.IdentityMapper;
 
 import java.io.IOException;
+import java.util.*;
+import java.util.logging.Logger;
 
 /**
  * LDA模型第一次运行前的初始化操作（及预操作）
  * Created by yuanye8 on 16/9/2.
  */
 public class InitModelTool implements GenericTool {
+
+    private static Logger LOG = Logger.getAnonymousLogger();
 
     public void run(String[] args) throws Exception {
         Flags flags = new Flags();
@@ -36,7 +48,98 @@ public class InitModelTool implements GenericTool {
         int minDf = flags.getInt("min_df");
 
         makeWordList(input, tfdf);
+        int numWords = selectWords(tfdf, wordlist, maxNumWords, minDf);
 
+        initModel(input, new Path(flags.getString("output_docs")), new Path(flags.getString("output_nwz")),
+                wordlist, flags.getInt("num_topics"), numWords);
+
+    }
+
+    public int selectWords(Path tfdf, Path wordlist, int maxNumWords, int minDf) throws IOException {
+        Map<String, WordFreq> wordCounts = loadWordFreq(tfdf);
+        List<String> specialKeys = new LinkedList<String>();
+        WordFreq total = (WordFreq) wordCounts.get(WordListMapper.NUM_DOCS_STRING);
+        if (total == null) {
+            throw new RuntimeException("No number of docs key in the word list.");
+        }
+
+        List<AnyDoublePair<String>> weights = new ArrayList<AnyDoublePair<String>>();
+
+        for (Map.Entry<String, WordFreq> e : wordCounts.entrySet()) {
+            if (e.getKey().startsWith("_")) {
+                specialKeys.add(e.getKey());
+            } else if (!e.getKey().equals(WordListMapper.NUM_DOCS_STRING)) {
+                WordFreq wf = e.getValue();
+                if (wf.df > minDf) {
+                    double weight = wf.tf / total.tf * Math.log(total.df / wf.df);
+                    weights.add(new AnyDoublePair<String>(e.getKey(), weight));
+                }
+            }
+        }
+        Collections.sort(weights, new Comparator<AnyDoublePair<String>>() {
+            public int compare(AnyDoublePair<String> o1, AnyDoublePair<String> o2) {
+                return Double.compare(o2.second, o1.second);
+            }
+        });
+        FolderWriter writer = new FolderWriter(wordlist, Text.class, IntWritable.class);
+
+        Text key = new Text();
+        IntWritable value = new IntWritable();
+        if (maxNumWords == -1) {
+            maxNumWords = Integer.MAX_VALUE;
+        }
+        int numWords = Math.min(maxNumWords, weights.size());
+        for (int i = 0; i < numWords; i++) {
+            key.set(weights.get(i).first);
+            value.set(i);
+            writer.append(key, value);
+        }
+        for (String specialKey : specialKeys) {
+            key.set(specialKey);
+            value.set(numWords);
+            writer.append(key, value);
+            numWords++;
+        }
+        writer.close();
+
+        JobConf envConf = new JobConf();
+        FileSystem fs = FileSystem.newInstance(envConf);
+        FSDataOutputStream out = fs.create(new Path(wordlist.getParent(), "wordmap.txt"));
+        byte[] numberWriter = (String.valueOf(numWords) + "\n").getBytes();
+        out.write(numberWriter, 0, numberWriter.length);
+
+        for (int i = 0; i< numWords; i++) {
+            byte[] toWrite = (weights.get(i).first + "\t" + i + "\n").getBytes();
+            out.write(toWrite, 0, toWrite.length);
+        }
+        out.close();
+        fs.close();
+
+        LOG.info("Load " + wordCounts.size() + " words, keep " + numWords);
+        return numWords;
+    }
+
+    /**
+     * 读取计算后的词频文件
+     * @param sqfile
+     * @return
+     * @throws IOException
+     */
+    public Map<String, WordFreq> loadWordFreq(Path sqfile) throws IOException {
+        Hashtable<String, WordFreq> keymap = new Hashtable<String, WordFreq>();
+        FolderReader reader = new FolderReader(sqfile);
+        Text key = new Text();
+        Text value = new Text();
+        while (reader.next(key, value)) {
+            WordFreq wf = new WordFreq();
+            String str = value.toString();
+            int split = str.indexOf(' ');
+            wf.tf = Long.parseLong(str.substring(0, split));
+            wf.df = Long.parseLong(str.substring(split + 1));
+            keymap.put(key.toString(), wf);
+        }
+        reader.close();
+        return keymap;
     }
 
     /**
@@ -80,5 +183,24 @@ public class InitModelTool implements GenericTool {
         job.setInt("num.words", numWords);
         JobClient.runJob(job);
 
+        combineModelParm(tmpNwz, outputNwz);
+        fs.delete(tmpNwz);
+        System.out.println("Done");
+    }
+
+    private void combineModelParm(Path tmpNwz, Path outputNwz) throws IOException {
+        MapReduceJobConf job = new MapReduceJobConf(getClass());
+        job.setJobName("CombineModelParametersForLDA");
+        job.setInputOutputPath(tmpNwz, outputNwz);
+        job.setMapReduce(IdentityMapper.class, CombineModelParamReducer.class);
+        job.setKeyValueClass(IntWritable.class, WordInfoWritable.class, IntWritable.class, WordInfoWritable.class);
+
+        job.setBoolean("take.mean", false);
+        JobClient.runJob(job);
+    }
+
+    private static class WordFreq {
+        public double tf;
+        public double df;
     }
 }

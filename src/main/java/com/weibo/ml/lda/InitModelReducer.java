@@ -33,18 +33,24 @@ public class InitModelReducer implements Reducer<Text, DocumentWritable, Text, D
     }
 
     public void reduce(Text key, Iterator<DocumentWritable> values, OutputCollector<Text, DocumentWritable> outputCollector, Reporter reporter) throws IOException {
-        DocumentWritable doc = (DocumentWritable) values.next();
+        while (values.hasNext()) {
+            DocumentWritable doc = (DocumentWritable) values.next();
 
-        for (int i = 0; i < doc.getNumWords(); i++) {
-            int word = doc.words[i];
-            int topic = this.randomProvider.nextInt(this.numTopics);
-            int[] counts = this.nwz[word];
-            if (counts == null) {
-                counts = new int[this.numTopics];
-                counts[topic] += 1;
+            for (int i = 0; i < doc.getNumWords(); i++) {
+                int word = doc.words[i];
+                int topic = this.randomProvider.nextInt(this.numTopics);
+                doc.topics[i] = topic;
+                int[] counts = this.nwz[word];
+                if (counts == null) {
+                    counts = new int[this.numTopics];
+                    counts[topic] += 1;
+                    this.nwz[word] = counts;
+                } else {
+                    counts[topic] += 1;
+                }
             }
+            outputCollector.collect(key, doc);
         }
-        outputCollector.collect(key, doc);
     }
 
     public void close() throws IOException {

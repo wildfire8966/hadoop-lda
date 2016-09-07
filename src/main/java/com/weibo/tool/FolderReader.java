@@ -7,6 +7,7 @@ import org.apache.hadoop.fs.PathFilter;
 import org.apache.hadoop.io.IntWritable;
 import org.apache.hadoop.io.SequenceFile;
 import org.apache.hadoop.io.Text;
+import org.apache.hadoop.io.Writable;
 import org.apache.hadoop.mapred.JobConf;
 
 import java.io.IOException;
@@ -72,7 +73,7 @@ public class FolderReader {
      * @return
      * @throws IOException
      */
-    public boolean next(Text key, IntWritable value) throws IOException {
+    public boolean next(Writable key, Writable value) throws IOException {
         if (this.currentReader == null) {
             return false;
         }

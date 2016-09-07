@@ -15,6 +15,7 @@ import java.util.logging.Logger;
 
 /**
  * 初始化模型Mapper程序，将文档读入、切分、按词典转化为int数组，以自定输出类DocumentWritable进行输出
+ * 初始化了word[], topic[], 两者为对应关系
  * Created by yuanye8 on 16/9/6.
  */
 public class InitModelMapper implements Mapper<Text, Text, Text, DocumentWritable> {
