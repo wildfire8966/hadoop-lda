@@ -16,6 +16,7 @@ import java.io.IOException;
 import java.io.OutputStreamWriter;
 import java.text.DecimalFormat;
 import java.text.NumberFormat;
+import java.util.TreeMap;
 import java.util.logging.Logger;
 
 /**
@@ -141,9 +142,35 @@ public class LdaTrainer implements GenericTool {
             initializer.makeWordList(input, tfdf);
             numWords = initializer.selectWords(tfdf, words, maxNumWords, minDf);
             initializer.initModel(input, docs0, nwz0, words, numTopics, numWords);
+            latest = 0;
+            logAndShow("Doc initialized.");
         } else {
             numWords = loadNumWords(words);
         }
+        //3. 开始迭代
+        for (int i = latest; i < numIterations; i++) {
+            logAndShow("Begin iteration #" + (i + 1));
+            Path previousDocs = new Path(workingDir, "docs." + formatter.format(i));
+            Path previousNwz = new Path(workingDir, "nwz." + formatter.format(i));
+            Path targetDocs = new Path(workingDir, "docs." + formatter.format(i + 1));
+            Path targetNwz = new Path(workingDir, "nwz." + formatter.format(i + 1));
+            double likelihood = sampler.sampling(previousDocs, targetDocs, previousNwz, targetNwz, alpha, beta, numTopics, numWords);
+            logAndShow("#" + i + " Likelihood: " + likelihood);
+            likelihoodWriter = new OutputStreamWriter(fs.create(new Path(workingDir, "likelihood"), true), "UTF-8");
+
+            likelihoodWriter.append(Double.toString(likelihood));
+            likelihoodWriter.append("\n");
+            likelihoodWriter.close();
+
+            //只保留最近n次
+            if (i + 1 - iterationToKeep >= 0) {
+                Path oldDocs = new Path(workingDir, "docs." + formatter.format(i + 1 - iterationToKeep));
+                fs.delete(oldDocs);
+                Path oldNwz = new Path(workingDir, "nwz." + formatter.format(i + 1 - iterationToKeep));
+                fs.delete(oldNwz);
+            }
+        }
+
 
     }
 
