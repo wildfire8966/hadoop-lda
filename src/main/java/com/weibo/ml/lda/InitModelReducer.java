@@ -16,6 +16,7 @@ import java.util.Iterator;
 import java.util.Random;
 
 /**
+ * nwz二维数组记录了每个word被分在不同topic下的次数
  * Created by yuanye8 on 16/9/6.
  */
 public class InitModelReducer implements Reducer<Text, DocumentWritable, Text, DocumentWritable> {

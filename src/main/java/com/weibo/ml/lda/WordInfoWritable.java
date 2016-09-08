@@ -7,10 +7,12 @@ import java.io.DataOutput;
 import java.io.IOException;
 
 /**
+ * nwz数组辅助写出类
  * Created by yuanye on 2016/9/6.
  */
 public class WordInfoWritable implements Writable {
     private int[] topicCount;
+    //写出缓冲区
     protected byte[] buffer;
     protected  boolean isPartial;
 

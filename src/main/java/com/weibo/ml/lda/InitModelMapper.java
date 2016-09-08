@@ -15,7 +15,7 @@ import java.util.logging.Logger;
 
 /**
  * 初始化模型Mapper程序，将文档读入、切分、按词典转化为int数组，以自定输出类DocumentWritable进行输出
- * 初始化了word[], topic[], 两者为对应关系
+ * 初始化了word[], topic[], 两者为对应关系，长度一致相等，用于描述一个文档的情况:这个文档的特征词及特征词属于的主题
  * Created by yuanye8 on 16/9/6.
  */
 public class InitModelMapper implements Mapper<Text, Text, Text, DocumentWritable> {
@@ -26,6 +26,7 @@ public class InitModelMapper implements Mapper<Text, Text, Text, DocumentWritabl
 
     public void map(Text key, Text value, OutputCollector<Text,
             DocumentWritable> outputCollector, Reporter reporter) throws IOException {
+        //以单个或连续多个空格进行分割
         String[] words = value.toString().split(" +");
         this.wordbuf.clear();
         for (int i = 0; i < words.length; i++) {
@@ -34,6 +35,7 @@ public class InitModelMapper implements Mapper<Text, Text, Text, DocumentWritabl
                 this.wordbuf.add(id);
             }
         }
+        //此处初始化了topic[]数组和words[]数组
         this.doc.setNumWords(this.wordbuf.size());
         for (int i = 0; i < this.wordbuf.size(); i++) {
             this.doc.words[i] = this.wordbuf.get(i).intValue();

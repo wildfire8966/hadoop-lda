@@ -81,8 +81,8 @@ public class InitModelTool implements GenericTool {
                 WordFreq wf = e.getValue();
                 if (wf.df > minDf) {
                     /**
-                     * 一个词出现的次数越多，且属于的文档越少，表明这个词区分度越大
-                     * 因此具有的价值越大，权值就越高
+                     * 词权重计算公式：wf.tf / total.tf * Math.log(total.df / wf.df)
+                     * 一个词出现的次数越多，且属于的文档越少，表明这个词区分度越大,因此具有的价值越大，权值就越高
                      */
                     double weight = wf.tf / total.tf * Math.log(total.df / wf.df);
                     weights.add(new AnyDoublePair<String>(e.getKey(), weight));
@@ -108,6 +108,7 @@ public class InitModelTool implements GenericTool {
         int numWords = Math.min(maxNumWords, weights.size());
         for (int i = 0; i < numWords; i++) {
             key.set(weights.get(i).first);
+            //wordlist即wordmap的二进制文件，占用空间小，读取速度快
             value.set(i);
             writer.append(key, value);
         }
@@ -118,13 +119,13 @@ public class InitModelTool implements GenericTool {
             numWords++;
         }
         writer.close();
-
+        //输出wordmap文件，非sequence文件，可以直接查看，方便调试
         JobConf envConf = new JobConf();
         FileSystem fs = FileSystem.newInstance(envConf);
         FSDataOutputStream out = fs.create(new Path(wordlist.getParent(), "wordmap.txt"));
         byte[] numberWriter = (String.valueOf(numWords) + "\n").getBytes();
         out.write(numberWriter, 0, numberWriter.length);
-
+        // ??? 若存在"_"开头的特殊key，那么此处numWords数会大于weights的size，导致获取异常
         for (int i = 0; i< numWords; i++) {
             byte[] toWrite = (weights.get(i).first + "\t" + i + "\n").getBytes();
             out.write(toWrite, 0, toWrite.length);
