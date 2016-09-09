@@ -86,6 +86,8 @@ public class GibbsSamplingTool implements GenericTool {
     }
 
     public  enum GibbsSamplingCounter {
-        LIKELIHOOD
+        LIKELIHOOD;
+
+        private GibbsSamplingCounter() {}
     }
 }
