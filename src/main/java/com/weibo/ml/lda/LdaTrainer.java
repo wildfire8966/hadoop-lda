@@ -3,13 +3,12 @@ package com.weibo.ml.lda;
 import com.weibo.misc.Flags;
 import com.weibo.tool.FolderReader;
 import com.weibo.tool.GenericTool;
-import org.apache.hadoop.fs.FileStatus;
-import org.apache.hadoop.fs.FileSystem;
-import org.apache.hadoop.fs.Path;
-import org.apache.hadoop.fs.PathFilter;
+import org.apache.hadoop.fs.*;
 import org.apache.hadoop.io.IntWritable;
+import org.apache.hadoop.io.NullWritable;
 import org.apache.hadoop.io.Text;
-import org.apache.hadoop.mapred.JobConf;
+import org.apache.hadoop.mapred.*;
+import org.apache.hadoop.mapred.lib.IdentityMapper;
 
 import java.io.DataOutputStream;
 import java.io.IOException;
@@ -171,7 +170,48 @@ public class LdaTrainer implements GenericTool {
             }
         }
 
+        Path targetDocs = new Path(workingDir, "docs." + formatter.format(numIterations));
+        Path outDocs = new Path(output, "docs");
+        combineDocs(targetDocs);
 
+        likelihoodWriter.close();
+        logAndShow("Training done.");
+
+        logAndShow("Export model to model file.");
+        ExportModelTool exportModelTool = new ExportModelTool();
+        exportModelTool.exportModel(workingDir, output, iterationToKeep);
+        logAndShow("Model exported.");
+    }
+
+    private void combineDocs(Path originalDocs) throws IOException {
+        JobConf job = new JobConf();
+        job.setJarByClass(getClass());
+        job.setJobName("eyr ball");
+        job.setInputFormat(SequenceFileInputFormat.class);
+        job.setOutputFormat(TextOutputFormat.class);
+
+        FileSystem fs = FileSystem.get(job);
+        ContentSummary sumary = fs.getContentSummary(originalDocs);
+        int reducerNumer = (int)Math.round(sumary.getLength() / 1024.0D / 1024.0D / 1024.0D / 2.0D);
+        if (reducerNumer == 0) {
+            reducerNumer = 1;
+        }
+        job.setNumReduceTasks(reducerNumer);
+
+        job.setMapOutputKeyClass(Text.class);
+        job.setMapOutputValueClass(DocumentWritable.class);
+
+        job.setOutputKeyClass(NullWritable.class);
+        job.setOutputValueClass(Text.class);
+
+        job.setMapperClass(IdentityMapper.class);
+        job.setReducerClass(CombineTassignReducer.class);
+
+        SequenceFileInputFormat.addInputPath(job, originalDocs);
+        FileOutputFormat.setOutputPath(job, new Path(originalDocs.getParent(), "tassign"));
+
+        RunningJob runningJob = JobClient.runJob(job);
+        runningJob.waitForCompletion();
     }
 
     private int loadNumWords(Path words) throws IOException {
