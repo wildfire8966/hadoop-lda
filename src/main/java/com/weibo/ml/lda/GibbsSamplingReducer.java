@@ -118,7 +118,9 @@ public class GibbsSamplingReducer implements Reducer<Text, DocumentWritable, Tex
             }
             long end1 = System.nanoTime();
             LOG.info("1: " + (end1 - begin));
-            //reporter.incrCounter(GibbsSamplingTool.GibbsSamplingCounter.LIKELIHOOD, (likelihood * GibbsSamplingTool.RESOLUTION));
+            reporter.incrCounter(
+                    GibbsSamplingTool.GibbsSamplingCounter.LIKELIHOOD,
+                    (long) (likelihood / doc.getNumWords() * GibbsSamplingTool.RESOLUTION));
             outputCollector.collect(key, doc);
         }
     }
