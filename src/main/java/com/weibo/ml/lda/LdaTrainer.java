@@ -63,11 +63,14 @@ public class LdaTrainer implements GenericTool {
         int minDf = flags.getInt("min_df");
 
         JobConf conf = new JobConf();
+
+        // Create model directory.
         FileSystem fs = FileSystem.get(conf);
         if (!fs.exists(workingDir)) {
             fs.mkdirs(workingDir);
         }
 
+        // Write model hyper-parameters to a file.
         Path parameters = new Path(workingDir, "parameters");
         if (!fs.exists(parameters)) {
             DataOutputStream out = fs.create(parameters, true);
@@ -77,9 +80,9 @@ public class LdaTrainer implements GenericTool {
             out.close();
         }
 
+        // Create likelihood file.
         OutputStreamWriter likelihoodWriter = new OutputStreamWriter(
                 fs.create(new Path(workingDir, "likelihood"), true), "UTF-8");
-
         likelihoodWriter.close();
 
         /**
@@ -90,7 +93,7 @@ public class LdaTrainer implements GenericTool {
         Path[] paths = { workingDir };
         FileStatus[] existNwz = fs.listStatus(paths, new PathFilter() {
             public boolean accept(Path p) {
-                LdaTrainer.this.LOG.info("Previous data:" + p.getName());
+                logAndShow("Previous data:" + p.getName());
                 return p.getName().startsWith("docs.");
             }
         });
@@ -137,7 +140,7 @@ public class LdaTrainer implements GenericTool {
             logAndShow("Text input converted to SequenceFile.");
         }
         // 2. 初始化参数及模型
-        if (latest == -1) {
+        if (latest == -1) {//这里一个思想很好：未初始化为-1，初始化后为0，之后递增，意义清晰
             initializer.makeWordList(input, tfdf);
             numWords = initializer.selectWords(tfdf, words, maxNumWords, minDf);
             initializer.initModel(input, docs0, nwz0, words, numTopics, numWords);

@@ -33,6 +33,7 @@ public class InitModelReducer implements Reducer<Text, DocumentWritable, Text, D
         this.nwz = new int[this.numWords][];
     }
 
+    //输出 id : doc(已初始化，int[] words, int[] topics)
     public void reduce(Text key, Iterator<DocumentWritable> values, OutputCollector<Text, DocumentWritable> outputCollector, Reporter reporter) throws IOException {
         while (values.hasNext()) {
             DocumentWritable doc = (DocumentWritable) values.next();
@@ -57,8 +58,12 @@ public class InitModelReducer implements Reducer<Text, DocumentWritable, Text, D
     public void close() throws IOException {
         String partName = "part-" + Math.abs(this.randomProvider.nextInt());
         JobConf envConf = new JobConf();
-        SequenceFile.Writer writer = SequenceFile.createWriter(FileSystem.get(envConf), envConf,
-                new Path(this.outputNwz + "/" + partName), IntWritable.class, WordInfoWritable.class);
+        SequenceFile.Writer writer = SequenceFile.createWriter(
+                FileSystem.get(envConf),
+                envConf,
+                new Path(this.outputNwz + "/" + partName),
+                IntWritable.class,
+                WordInfoWritable.class);
         saveModelParameters(this.nwz, writer);
         writer.close();
     }

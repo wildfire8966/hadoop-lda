@@ -11,10 +11,13 @@ import org.apache.hadoop.mapred.lib.IdentityReducer;
 import java.io.IOException;
 
 /**
- * 转化纯文本输入文件为hadoop二进制输入文件（专门供hadoop MR程序中间过程使用的文件格式）
+ * 转化纯文本输入文件为hadoop二进制输入文件
+ * 整个项目都用到了SequenceFile作为中间结果，个人认为是因为这样的二进制文件会经过压缩，容量更小，
+ * 因此在多次迭代时，明显提升了磁盘IO效率和网络传输效率
  * Created by yuanye8 on 16/9/5.
  */
 public class PlainTextToSeqFileTool implements GenericTool {
+
     //单测使用
     public void run(String[] args) throws Exception {
         Flags flags = new Flags();
@@ -22,7 +25,9 @@ public class PlainTextToSeqFileTool implements GenericTool {
         flags.add("output");
         flags.parseAndCheck(args);
 
-        convertToSequenceFile(new Path(flags.getString("input")), new Path(flags.getString("output")));
+        convertToSequenceFile(
+                new Path(flags.getString("input")),
+                new Path(flags.getString("output")));
 
     }
 
@@ -36,6 +41,7 @@ public class PlainTextToSeqFileTool implements GenericTool {
         job.setReducerClass(IdentityReducer.class);
         job.setNumReduceTasks(0);
 
+        //输入和输出类型，需要明确关注
         job.setInputFormat(TextInputFormat.class);
         job.setOutputFormat(SequenceFileOutputFormat.class);
 

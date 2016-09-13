@@ -41,6 +41,7 @@ public class FolderWriter {
         } else if (fs.exists(path)) {
             Path[] root = { path };
             FileStatus[] parts = fs.listStatus(root);
+            //此处很巧，parts的length就是下一个parts的标号
             String partnum = partFormatter.format(parts.length);
             outputPart = new Path(path, "part-" + partnum);
             this.LOG.info("folder exists, write to a new part:" + outputPart.toString());

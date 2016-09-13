@@ -4,9 +4,7 @@ import org.apache.hadoop.fs.FileStatus;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.fs.PathFilter;
-import org.apache.hadoop.io.IntWritable;
 import org.apache.hadoop.io.SequenceFile;
-import org.apache.hadoop.io.Text;
 import org.apache.hadoop.io.Writable;
 import org.apache.hadoop.mapred.JobConf;
 
@@ -96,7 +94,7 @@ public class FolderReader {
         if (this.currentPart >= this.parts.length) {
             return false;
         }
-        this.currentReader  = new SequenceFile.Reader(this.fs, this.parts[this.currentPart].getPath(), this.conf);
+        this.currentReader  = new SequenceFile.Reader(fs, parts[this.currentPart].getPath(), conf);
         return true;
     }
 

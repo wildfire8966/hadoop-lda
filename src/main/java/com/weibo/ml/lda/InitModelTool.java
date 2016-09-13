@@ -6,16 +6,13 @@ import com.weibo.misc.Flags;
 import com.weibo.tool.FolderReader;
 import com.weibo.tool.FolderWriter;
 import com.weibo.tool.GenericTool;
-import org.apache.hadoop.fs.FSDataInputStream;
 import org.apache.hadoop.fs.FSDataOutputStream;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.io.IntWritable;
 import org.apache.hadoop.io.Text;
-import org.apache.hadoop.io.compress.DoNotPool;
 import org.apache.hadoop.mapred.JobClient;
 import org.apache.hadoop.mapred.JobConf;
-import org.apache.hadoop.mapred.SequenceFileOutputFormat;
 import org.apache.hadoop.mapred.lib.IdentityMapper;
 
 import java.io.IOException;
@@ -48,20 +45,35 @@ public class InitModelTool implements GenericTool {
         int minDf = flags.getInt("min_df");
 
         makeWordList(input, tfdf);
+
         int numWords = selectWords(tfdf, wordlist, maxNumWords, minDf);
 
-        initModel(input, new Path(flags.getString("output_docs")), new Path(flags.getString("output_nwz")),
-                wordlist, flags.getInt("num_topics"), numWords);
+        LOG.info("After select words, numWords is: " + numWords + ".");
+
+        initModel(
+                input,
+                new Path(flags.getString("output_docs")),
+                new Path(flags.getString("output_nwz")),
+                wordlist,
+                flags.getInt("num_topics"),
+                numWords);
 
     }
 
     /**
-     * 处理结果均已文本格式写在HDFS上，可以直接使用hadoop cat命令查看
-     * @param tfdf  输入：词频文件路径
-     * @param wordlist  输出：词权重，格式为 "word weight"
-     * @param maxNumWords 输入：设定的允许最大词数
-     * @param minDf 输入：设定的某个词存在于各文档中的文档的个数，用于过滤低质量词
-     * @return 所有语料的词汇集合的大小
+     * Load word list, make word to id mapping.
+     * All words are first sorted by their TF*IDF value. The top maxNumWords words
+     * are used for training. TF*IDF is a widely used method for selecting
+     * informative words in Information Retrieval, see Wikipedia for a more
+     * detailed explanation.
+     *
+     * Note: words started with an underscore '_' are always kept, and they are
+     * not count as number of words. This is used for special purpose.
+     *
+     * @param tfdf SequenceFile of "word":"tf df".
+     * @param maxNumWords How many words to keep for training, -1 means all.
+     * @param minDf limit number a word must appear in different documents
+     * @return number of words used.
      * @throws IOException
      */
     public int selectWords(Path tfdf, Path wordlist, int maxNumWords, int minDf) throws IOException {
@@ -73,7 +85,7 @@ public class InitModelTool implements GenericTool {
         }
 
         List<AnyDoublePair<String>> weights = new ArrayList<AnyDoublePair<String>>();
-        //特殊词汇含义不清，可能为遗留问题
+        //特殊词汇留作它用
         for (Map.Entry<String, WordFreq> e : wordCounts.entrySet()) {
             if (e.getKey().startsWith("_")) {
                 specialKeys.add(e.getKey());
@@ -125,7 +137,6 @@ public class InitModelTool implements GenericTool {
         FSDataOutputStream out = fs.create(new Path(wordlist.getParent(), "wordmap.txt"));
         byte[] numberWriter = (String.valueOf(numWords) + "\n").getBytes();
         out.write(numberWriter, 0, numberWriter.length);
-        // ??? 若存在"_"开头的特殊key，那么此处numWords数会大于weights的size，导致获取异常
         for (int i = 0; i< numWords; i++) {
             byte[] toWrite = (weights.get(i).first + "\t" + i + "\n").getBytes();
             out.write(toWrite, 0, toWrite.length);
@@ -187,7 +198,6 @@ public class InitModelTool implements GenericTool {
         wordlist = wordlist.makeQualified(fs);
 
         MapReduceJobConf job = new MapReduceJobConf(getClass());
-        // ??? fs.mkdirs(tmpNwz);
         FileSystem.get(job).mkdirs(tmpNwz);
         job.setJobName("InitializeModelForLDA");
         job.setMapReduce(InitModelMapper.class, InitModelReducer.class);
