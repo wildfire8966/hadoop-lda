@@ -11,10 +11,12 @@ import java.util.Arrays;
 import java.util.Iterator;
 
 /**
+ * Combine the word topic counts from different samplers.
  * Created by yuanye8 on 16/9/7.
  */
 public class CombineModelParamReducer implements Reducer<IntWritable, WordInfoWritable, IntWritable, WordInfoWritable> {
     private int[] topicCount = null;
+    //此处无实际用处，原代码遗留
     private int[] referenceCount = null;
     private WordInfoWritable outvalue = null;
     private boolean takeMean = true;
@@ -50,6 +52,7 @@ public class CombineModelParamReducer implements Reducer<IntWritable, WordInfoWr
         for (int i = 0; i< this.topicCount.length; i++) {
             this.outvalue.setTopicCount(i, this.topicCount[i] + this.referenceCount[i]);
         }
+        //所有key下的部分合成为一个word的整体topics分布
         this.outvalue.setIsPartial(false);
         outputCollector.collect(key, this.outvalue);
     }

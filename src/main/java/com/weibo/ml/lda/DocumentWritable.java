@@ -21,7 +21,7 @@ public class DocumentWritable implements Writable{
     }
 
     public void setNumWords(int n) {
-        if (this.words == null || this.words.length < 0) {
+        if (this.words == null || this.words.length < n) {
             this.words = new int[n];
             this.topics = new int[n];
         }

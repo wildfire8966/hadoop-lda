@@ -1,5 +1,6 @@
 package com.weibo.tool;
 
+import com.weibo.ml.lda.InitModelTool;
 import com.weibo.ml.lda.PlainTextToSeqFileTool;
 
 /**
@@ -9,7 +10,7 @@ import com.weibo.ml.lda.PlainTextToSeqFileTool;
 public class LDATester {
     public static void main(String[] args) throws Exception {
         if (args.length < 1) {
-            System.out.println("usage: transtext ");
+            System.out.println("usage: transtext initmodel");
             return;
         }
 
@@ -22,6 +23,8 @@ public class LDATester {
         GenericTool tool = null;
         if (command.equals("transtext")) {
             tool = new PlainTextToSeqFileTool();
+        } else if (command.equals("initmodel")) {
+            tool = new InitModelTool();
         }
 
         tool.run(realArgs);

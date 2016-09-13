@@ -2,3 +2,5 @@
 *.iml
 out/
 target/
+MANIFEST.MF
+classes/

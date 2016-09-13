@@ -82,6 +82,7 @@ public class InitModelReducer implements Reducer<Text, DocumentWritable, Text, D
             for (int j = 0; j < this.numTopics; j++) {
                 value.setTopicCount(j, counts[j]);
             }
+            //此时输出的每个词的topic分布都是一部分而不是全部
             value.setIsPartial(true);
             writer.append(key, value);
         }

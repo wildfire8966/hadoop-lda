@@ -39,7 +39,7 @@ public class InitModelTool implements GenericTool {
         flags.parseAndCheck(args);
 
         Path input = new Path(flags.getString("input"));
-        Path tfdf = new Path(flags.getString("wordlist") + ".tf_df");
+        Path tfdf = new Path("tfdf");
         Path wordlist = new Path(flags.getString("wordlist"));
         int maxNumWords = flags.getInt("max_num_words");
         int minDf = flags.getInt("min_df");
@@ -47,8 +47,6 @@ public class InitModelTool implements GenericTool {
         makeWordList(input, tfdf);
 
         int numWords = selectWords(tfdf, wordlist, maxNumWords, minDf);
-
-        LOG.info("After select words, numWords is: " + numWords + ".");
 
         initModel(
                 input,
@@ -89,16 +87,18 @@ public class InitModelTool implements GenericTool {
         for (Map.Entry<String, WordFreq> e : wordCounts.entrySet()) {
             if (e.getKey().startsWith("_")) {
                 specialKeys.add(e.getKey());
-            } else if (!e.getKey().equals(WordListMapper.NUM_DOCS_STRING)) {
-                WordFreq wf = e.getValue();
-                if (wf.df > minDf) {
-                    /**
-                     * 词权重计算公式：wf.tf / total.tf * Math.log(total.df / wf.df)
-                     * 一个词出现的次数越多，且属于的文档越少，表明这个词区分度越大,因此具有的价值越大，权值就越高
-                     */
-                    double weight = wf.tf / total.tf * Math.log(total.df / wf.df);
-                    weights.add(new AnyDoublePair<String>(e.getKey(), weight));
-                }
+                continue;
+            } else if (e.getKey().equals(WordListMapper.NUM_DOCS_STRING)) {
+                continue;
+            }
+            WordFreq wf = e.getValue();
+            if (wf.df > minDf) {
+                /**
+                 * 词权重计算公式：wf.tf / total.tf * Math.log(total.df / wf.df)
+                 * 一个词出现的次数越多，且属于的文档越少，表明这个词区分度越大,因此具有的价值越大，权值就越高
+                 */
+                double weight = wf.tf / total.tf * Math.log(total.df / wf.df);
+                weights.add(new AnyDoublePair<String>(e.getKey(), weight));
             }
         }
         Collections.sort(weights, new Comparator<AnyDoublePair<String>>() {
@@ -143,7 +143,7 @@ public class InitModelTool implements GenericTool {
         }
         out.close();
         fs.close();
-
+        //wordCount.size()应该比numWords大1，因为它包含了总的统计
         LOG.info("Load " + wordCounts.size() + " words, keep " + numWords);
         return numWords;
     }
@@ -178,7 +178,7 @@ public class InitModelTool implements GenericTool {
      * @throws IOException
      */
     public void makeWordList(Path input, Path output) throws IOException {
-        MapReduceJobConf job = new MapReduceJobConf();
+        MapReduceJobConf job = new MapReduceJobConf(this.getClass());
         job.setJobName("EstimateWordFreqForLDA");
         job.setMapReduce(WordListMapper.class, WordListReducer.class);
         job.setCombinerClass(WordListCombiner.class);
@@ -194,10 +194,10 @@ public class InitModelTool implements GenericTool {
         FileSystem fs = FileSystem.get(envConf);
 
         //确保路径下的权限
-        Path tmpNwz = new Path(outputNwz, "_tmp").makeQualified(fs);
+        Path tmpNwz = new Path(outputNwz + "_tmp").makeQualified(fs);
         wordlist = wordlist.makeQualified(fs);
 
-        MapReduceJobConf job = new MapReduceJobConf(getClass());
+        MapReduceJobConf job = new MapReduceJobConf(this.getClass());
         FileSystem.get(job).mkdirs(tmpNwz);
         job.setJobName("InitializeModelForLDA");
         job.setMapReduce(InitModelMapper.class, InitModelReducer.class);

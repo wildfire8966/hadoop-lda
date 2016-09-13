@@ -28,13 +28,13 @@ public class Counter<KeyType> {
     }
 
     public void inc(KeyType key, long delta) {
-        this.hash.put(key, Long.valueOf(get(key)) + delta);
+        this.hash.put(key, get(key) + delta);
     }
 
     public long get(KeyType key) {
-        Long current = (long)this.hash.get(key);
+        Long current = this.hash.get(key);
         if (current == null) {
-            current = Long.valueOf(0L);
+            current = 0L;
         }
         return current;
     }
