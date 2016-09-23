@@ -44,7 +44,7 @@ public class GibbsSamplingReducer implements Reducer<Text, DocumentWritable, Tex
         this.probs = new double[this.numTopics];
         //某个文档被分到K个主题下的次数
         this.nzd = new int[this.numTopics];
-        //某个主题得到的分配到其下的总次数
+        //某个主题得到的分配到其下的词的数目
         this.nz = new int[this.numTopics];
         this.outputNwz = conf.get("output.nwz");
         this.alpha = conf.getFloat("alpha", 0.0F);

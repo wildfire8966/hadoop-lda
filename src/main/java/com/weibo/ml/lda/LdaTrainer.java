@@ -19,6 +19,7 @@ import java.util.TreeMap;
 import java.util.logging.Logger;
 
 /**
+ * 训练模型入口类
  * Created by yuanye8 on 16/9/2.
  */
 public class LdaTrainer implements GenericTool {
@@ -156,10 +157,14 @@ public class LdaTrainer implements GenericTool {
             Path previousNwz = new Path(workingDir, "nwz." + formatter.format(i));
             Path targetDocs = new Path(workingDir, "docs." + formatter.format(i + 1));
             Path targetNwz = new Path(workingDir, "nwz." + formatter.format(i + 1));
-            double likelihood = sampler.sampling(previousDocs, targetDocs, previousNwz, targetNwz, alpha, beta, numTopics, numWords);
+            double likelihood = sampler.sampling(
+                    previousDocs, targetDocs,
+                    previousNwz, targetNwz,
+                    alpha, beta, numTopics, numWords);
             logAndShow("#" + i + " Likelihood: " + likelihood);
-            likelihoodWriter = new OutputStreamWriter(fs.create(new Path(workingDir, "likelihood"), true), "UTF-8");
-
+            likelihoodWriter = new OutputStreamWriter(
+                    fs.create(new Path(workingDir, "likelihood"), true),
+                    "UTF-8");
             likelihoodWriter.append(Double.toString(likelihood));
             likelihoodWriter.append("\n");
             likelihoodWriter.close();
