@@ -78,7 +78,8 @@ public class GibbsSamplingTool implements GenericTool {
 
         RunningJob runningJob = JobClient.runJob(job);
         runningJob.waitForCompletion();
-        double likelihood = runningJob.getCounters().getCounter(GibbsSamplingCounter.LIKELIHOOD) / RESOLUTION;
+        //此处除以100000是为了减小likelihood数量级，当稳定后，samping后词被分到每个主题的概率会趋于稳定likelihood的值也应该稳定下来
+        double likelihood = runningJob.getCounters().getCounter(GibbsSamplingCounter.LIKELIHOOD) / RESOLUTION / 100000;
         
         combineModelParam(inputNwz, tmpNwz, outputNwz);
         fs.delete(tmpNwz);

@@ -128,9 +128,13 @@ public class GibbsSamplingReducer implements Reducer<Text, DocumentWritable, Tex
             }
             //long end1 = System.nanoTime();
             //LOG.info("1: " + (end1 - begin));
+            /**
+             * 此处乘以100，是为了使likelihood得到一个非零数字
+             * 按原来代码的话，强转成long后永远都是0，likelihood失去意义
+             */
             reporter.incrCounter(
                     GibbsSamplingTool.GibbsSamplingCounter.LIKELIHOOD,
-                    (long) (likelihood /* / doc.getNumWords() */ * GibbsSamplingTool.RESOLUTION));
+                    (long) (likelihood /* / doc.getNumWords() */ * GibbsSamplingTool.RESOLUTION * 100));
             outputCollector.collect(key, doc);
         }
     }
