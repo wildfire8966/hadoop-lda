@@ -40,7 +40,7 @@ public class LdaTrainer implements GenericTool {
         flags.add("num_iterations", "number of iterations.");
 
         //非必须参数
-        flags.addWithDefaultValue("alpha", "-1", "symmetric hyper-parameter alpha. [default k/50]");
+        flags.addWithDefaultValue("alpha", "-1", "symmetric hyper-parameter alpha. [default 50/k]");
         flags.addWithDefaultValue("beta", "0.01", "symmetric hyper-parameter beta. [default 0.01]");
         flags.addWithDefaultValue("iterations_to_keep", "10", "number of iterations to keep on disk, and used for final model. [default 10]");
         flags.addWithDefaultValue("max_num_words", "100000", "max number of words to use, sorted by TF*IDF. [default 100000]");

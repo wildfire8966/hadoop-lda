@@ -19,6 +19,7 @@ public class CombineModelParamReducer implements Reducer<IntWritable, WordInfoWr
     //此处无实际用处，原代码遗留
     private int[] referenceCount = null;
     private WordInfoWritable outvalue = null;
+    //暂无实际用处
     private boolean takeMean = true;
 
     public void configure(JobConf jobConf) {

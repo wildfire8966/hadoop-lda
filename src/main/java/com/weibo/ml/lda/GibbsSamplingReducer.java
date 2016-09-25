@@ -18,6 +18,10 @@ import java.util.logging.Logger;
 /**
  * LDA核心迭代部分，吉布斯三重采样： -1 -> sampling -> +1
  * 相当于去除某个词后，计算主题相关的概率（即某个词被重新分配）， 之后把该词的重新分配结果回填
+ * Perform Gibbs Sampling on documents. When starting, the reducer loads p(w|z)
+ * from the model file. Then it uses p(w|z) to sample topics for input documents
+ * After all entries reduced, the reducer output the modified p(w|z) back to the
+ * file system.
  * Created by yuanye on 2016/9/8.
  */
 public class GibbsSamplingReducer implements Reducer<Text, DocumentWritable, Text, DocumentWritable> {
@@ -85,10 +89,10 @@ public class GibbsSamplingReducer implements Reducer<Text, DocumentWritable, Tex
             if (this.nwz[i] == null)  {
                 this.nwz[i] = new int[this.numTopics];
             }
-            if (this.delta_nwz == null) {
+            if (this.delta_nwz[i] == null) {
                 this.delta_nwz[i] = new int[this.numTopics];
             }
-            Arrays.fill(this.delta_nwz, 0);
+            Arrays.fill(this.delta_nwz[i], 0);
         }
         fr.close();
         long duration = System.currentTimeMillis() - startTime;
@@ -97,30 +101,36 @@ public class GibbsSamplingReducer implements Reducer<Text, DocumentWritable, Tex
 
     public void reduce(Text key, Iterator<DocumentWritable> values, OutputCollector<Text, DocumentWritable> outputCollector, Reporter reporter) throws IOException {
         while (values.hasNext()) {
-            long begin = System.nanoTime();
+            //long begin = System.nanoTime();
             DocumentWritable doc = (DocumentWritable) values.next();
             computeNzd(doc, this.nzd);
-            double likelihood = 0.0D;
+            double likelihood = 0.0;
             int doc_length = doc.getNumWords();
 
             for (int i = 0; i < doc.getNumWords(); i++) {
                 int topic = doc.topics[i];
                 int word = doc.words[i];
+
                 this.nzd[topic] -= 1;
                 this.nz[topic] -= 1;
                 this.nwz[word][topic] -= 1;
+                delta_nwz[word][topic] -= 1;
+
                 likelihood += computeSamplingProbability(this.nzd, word, this.probs, this.alpha, this.beta, doc_length - 1);
                 topic = sampleInDistribution(this.probs, this.randomProvider);
+
                 doc.topics[i] = topic;
                 this.nzd[topic] += 1;
+                this.nz[topic] += 1;
                 this.nwz[word][topic] += 1;
                 this.delta_nwz[word][topic] += 1;
+
             }
-            long end1 = System.nanoTime();
-            LOG.info("1: " + (end1 - begin));
+            //long end1 = System.nanoTime();
+            //LOG.info("1: " + (end1 - begin));
             reporter.incrCounter(
                     GibbsSamplingTool.GibbsSamplingCounter.LIKELIHOOD,
-                    (long) (likelihood / doc.getNumWords() * GibbsSamplingTool.RESOLUTION));
+                    (long) (likelihood /* / doc.getNumWords() */ * GibbsSamplingTool.RESOLUTION));
             outputCollector.collect(key, doc);
         }
     }
