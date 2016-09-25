@@ -21,6 +21,9 @@ import java.util.Map;
 import java.util.logging.Logger;
 
 /**
+ * Export the accumulated NWZs from last n iterations to an independent
+ * text file. Other software can then read the model in plain text file, which
+ * will make the resulted model independent of Hadoop framework.
  * Created by yuanye8 on 16/9/12.
  */
 public class ExportModelTool implements GenericTool {
@@ -79,6 +82,7 @@ public class ExportModelTool implements GenericTool {
         JobConf conf = new JobConf();
         FileSystem fs = FileSystem.get(conf);
 
+        // Load model hyper-parameters.
         Path parameters = new Path(modelPath, "parameters");
         DataInputStream ins = fs.open(parameters);
         this.alpha = ins.readDouble();
@@ -95,6 +99,7 @@ public class ExportModelTool implements GenericTool {
                 return path.getName().contains("nwz.");
             }
         });
+
         Arrays.sort(modelFiles, new Comparator<FileStatus>() {
             public int compare(FileStatus p0, FileStatus p1) {
                 return p1.getPath().compareTo(p0.getPath());
@@ -131,16 +136,19 @@ public class ExportModelTool implements GenericTool {
         reader.close();
     }
 
+    /**
+     * Load word to id mapping.
+     */
     private Map<Integer, String> loadWords(Path path) throws IOException {
-        this.wordIds = new Hashtable<Integer, String>();
-        Map<Integer, String> keymap = new Hashtable<Integer, String>();
-        FolderReader reader = new FolderReader(path);
-        Text key = new Text();
-        IntWritable value = new IntWritable();
-        while (reader.next(key, value)) {
-            keymap.put(Integer.valueOf(value.get()), key.toString());
-        }
-        reader.close();
+            this.wordIds = new Hashtable<Integer, String>();
+            Map<Integer, String> keymap = new Hashtable<Integer, String>();
+            FolderReader reader = new FolderReader(path);
+            Text key = new Text();
+            IntWritable value = new IntWritable();
+            while (reader.next(key, value)) {
+                keymap.put(Integer.valueOf(value.get()), key.toString());
+            }
+            reader.close();
         return keymap;
     }
 

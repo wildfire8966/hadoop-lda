@@ -178,9 +178,9 @@ public class LdaTrainer implements GenericTool {
             }
         }
 
-        Path targetDocs = new Path(workingDir, "docs." + formatter.format(numIterations));
-        Path outDocs = new Path(output, "docs");
-        combineDocs(targetDocs);
+        //Path targetDocs = new Path(workingDir, "docs." + formatter.format(numIterations));
+        //Path outDocs = new Path(output, "docs");
+        //combineDocs(targetDocs);
 
         likelihoodWriter.close();
         logAndShow("Training done.");
