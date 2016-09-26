@@ -1,5 +1,6 @@
 package com.weibo.tool;
 
+import com.weibo.ml.lda.ExportModelTool;
 import com.weibo.ml.lda.GibbsSamplingTool;
 import com.weibo.ml.lda.InitModelTool;
 import com.weibo.ml.lda.PlainTextToSeqFileTool;
@@ -11,7 +12,7 @@ import com.weibo.ml.lda.PlainTextToSeqFileTool;
 public class LDATester {
     public static void main(String[] args) throws Exception {
         if (args.length < 1) {
-            System.out.println("usage: transtext initmodel sampling");
+            System.out.println("usage: transtext initmodel sampling outputmodel");
             return;
         }
 
@@ -28,8 +29,13 @@ public class LDATester {
             tool = new InitModelTool();
         } else if (command.equals("sampling")) {
             tool = new GibbsSamplingTool();
+        } else if (command.equals("outputmodel")) {
+            tool = new ExportModelTool();
         }
 
+        if (tool == null) {
+            System.out.println("Init lda tester failed.");
+        }
         tool.run(realArgs);
     }
 }

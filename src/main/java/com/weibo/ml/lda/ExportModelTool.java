@@ -84,11 +84,19 @@ public class ExportModelTool implements GenericTool {
 
         // Load model hyper-parameters.
         Path parameters = new Path(modelPath, "parameters");
-        DataInputStream ins = fs.open(parameters);
-        this.alpha = ins.readDouble();
-        this.beta = ins.readDouble();
-        this.numTopics = ins.readInt();
-        ins.close();
+        if (fs.exists(parameters)) {
+            DataInputStream ins = fs.open(parameters);
+            this.alpha = ins.readDouble();
+            this.beta = ins.readDouble();
+            this.numTopics = ins.readInt();
+            ins.close();
+        } else {
+            //如果不存在参数文件，默认参数，便于测试
+            this.numTopics = 500;
+            this.alpha = 50.0 / this.numTopics;
+            this.beta = 0.01;
+        }
+
         LOG.info("Load model parameters, alpha:" + this.alpha + " beta:" + this.beta + " num_topics:" + this.numTopics);
 
         this.explainations = new String[this.numTopics];

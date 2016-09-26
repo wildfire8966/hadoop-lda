@@ -19,7 +19,7 @@ import java.util.TreeMap;
 import java.util.logging.Logger;
 
 /**
- * 训练模型入口类
+ * 训练模型入口
  * Created by yuanye8 on 16/9/2.
  */
 public class LdaTrainer implements GenericTool {
@@ -40,7 +40,7 @@ public class LdaTrainer implements GenericTool {
         flags.add("num_iterations", "number of iterations.");
 
         //非必须参数
-        flags.addWithDefaultValue("alpha", "-1", "symmetric hyper-parameter alpha. [default 50/k]");
+        flags.addWithDefaultValue("alpha", "-1", "symmetric hyper-parameter alpha. [default 50.0/k]");
         flags.addWithDefaultValue("beta", "0.01", "symmetric hyper-parameter beta. [default 0.01]");
         flags.addWithDefaultValue("iterations_to_keep", "10", "number of iterations to keep on disk, and used for final model. [default 10]");
         flags.addWithDefaultValue("max_num_words", "100000", "max number of words to use, sorted by TF*IDF. [default 100000]");
@@ -55,8 +55,8 @@ public class LdaTrainer implements GenericTool {
         int numTopics = flags.getInt("num_topics");
         int numIterations = flags.getInt("num_iterations");
         double alpha = flags.getDouble("alpha");
-        if (alpha == -1.0D) {
-            alpha = 50.0D / numTopics;
+        if (alpha == -1.0) {
+            alpha = 50.0 / numTopics;
         }
         double beta = flags.getDouble("beta");
         int iterationToKeep = flags.getInt("iterations_to_keep");
@@ -108,15 +108,14 @@ public class LdaTrainer implements GenericTool {
         if (latest >= 0) {
             logAndShow("Found previous training data at iteration #" + latest + ".");
             Path latestDocs = new Path(workingDir, "docs." + formatter.format(latest));
-
             Path latestNwz = new Path(workingDir, "nwz." + formatter.format(latest));
-
             if (fs.exists(latestDocs)) {
                 fs.delete(latestDocs);
             }
             if (fs.exists(latestNwz)) {
                 fs.delete(latestNwz);
             }
+
             latest--;
             logAndShow("Remove probably incomplete iteration #"
                     + (latest + 1) + ", start with iteration #" + latest + ".");
@@ -178,9 +177,9 @@ public class LdaTrainer implements GenericTool {
             }
         }
 
-        //Path targetDocs = new Path(workingDir, "docs." + formatter.format(numIterations));
-        //Path outDocs = new Path(output, "docs");
-        //combineDocs(targetDocs);
+        //output tassign matrix to text file
+        Path targetDocs = new Path(workingDir, "docs." + formatter.format(numIterations));
+        combineDocs(targetDocs);
 
         likelihoodWriter.close();
         logAndShow("Training done.");
@@ -189,18 +188,24 @@ public class LdaTrainer implements GenericTool {
         ExportModelTool exportModelTool = new ExportModelTool();
         exportModelTool.exportModel(workingDir, output, iterationToKeep);
         logAndShow("Model exported.");
+
+        long endTime = System.currentTimeMillis();
+        DecimalFormat decimalFormat = new DecimalFormat("0.0");
+        String duration_hour = decimalFormat.format((this.startTime - endTime) / 3600.0 / 1000.0);
+        logAndShow("Training time consuming: " + duration_hour + " hours.");
     }
 
     private void combineDocs(Path originalDocs) throws IOException {
         JobConf job = new JobConf();
         job.setJarByClass(getClass());
-        job.setJobName("eyr ball");
+        job.setJobName("OutputTassignMatrixForLDA");
         job.setInputFormat(SequenceFileInputFormat.class);
         job.setOutputFormat(TextOutputFormat.class);
 
         FileSystem fs = FileSystem.get(job);
         ContentSummary sumary = fs.getContentSummary(originalDocs);
-        int reducerNumer = (int)Math.round(sumary.getLength() / 1024.0D / 1024.0D / 1024.0D / 2.0D);
+        //each reducer deal with data less than 2G
+        int reducerNumer = (int)Math.round(sumary.getLength() / 1024.0 / 1024.0 / 1024.0 / 2.0);
         if (reducerNumer == 0) {
             reducerNumer = 1;
         }

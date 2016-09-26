@@ -11,6 +11,10 @@ import java.io.IOException;
 import java.util.Iterator;
 
 /**
+ * Ouput tassign matrix as text file for lda
+ * every line in this text file represents a document.
+ * the line of tassign matrix looks like:
+ * word_id1:topic1 word_id2:topic2 ... word_id_n:topic_n
  * Created by yuanye8 on 16/9/12.
  */
 public class CombineTassignReducer implements Reducer<Text, DocumentWritable, NullWritable, Text> {
