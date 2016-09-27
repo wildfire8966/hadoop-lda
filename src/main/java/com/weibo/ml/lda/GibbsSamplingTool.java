@@ -41,21 +41,28 @@ public class GibbsSamplingTool implements GenericTool {
         flags.add("beta");
         flags.add("num_topics");
         flags.add("num_words");
+        flags.add("map_num");
+        flags.add("reduce_num");
         flags.parseAndCheck(args);
 
         double likelihood = sampling(
                                         new Path(flags.getString("input_docs")), new Path(flags.getString("output_docs")),
                                         new Path(flags.getString("input_nwz")), new Path(flags.getString("output_nwz")),
                                         flags.getDouble("alpha"), flags.getDouble("beta"),
-                                        flags.getInt("num_topics"), flags.getInt("num_words")
+                                        flags.getInt("num_topics"), flags.getInt("num_words"),
+                                        flags.getInt("map_num"), flags.getInt("reduce_num")
                                     );
 
 
         System.out.println("Done with likelihood " + likelihood);
     }
 
-    public double sampling(Path inputDocs, Path outputDocs, Path inputNwz, Path outputNwz, double alpha, double beta, int numTopics, int numWords)
-            throws IOException
+    public double sampling(
+            Path inputDocs, Path outputDocs,
+            Path inputNwz, Path outputNwz,
+            double alpha, double beta,
+            int numTopics, int numWords,
+            int map, int reduce) throws IOException
     {
         JobConf envConf = new JobConf();
         FileSystem fs = FileSystem.get(envConf);
@@ -63,7 +70,7 @@ public class GibbsSamplingTool implements GenericTool {
         Path tmpNwz = new Path(outputNwz + "_tmp").makeQualified(fs);
         inputNwz = inputNwz.makeQualified(fs);
         //注意此处要传入getClass()
-        MapReduceJobConf job = new MapReduceJobConf(getClass());
+        MapReduceJobConf job = new MapReduceJobConf(getClass(), map, reduce);
         FileSystem.get(job).mkdirs(tmpNwz);
         job.setJobName("GibbsSamplingForLDA");
         job.setInputOutputPath(inputDocs, outputDocs);
@@ -78,16 +85,16 @@ public class GibbsSamplingTool implements GenericTool {
 
         RunningJob runningJob = JobClient.runJob(job);
         runningJob.waitForCompletion();
-        //此处除以100000是为了减小likelihood数量级，当稳定后，samping后词被分到每个主题的概率会趋于稳定likelihood的值也应该稳定下来
-        double likelihood = runningJob.getCounters().getCounter(GibbsSamplingCounter.LIKELIHOOD) / RESOLUTION / 100000;
+
+        double likelihood = runningJob.getCounters().getCounter(GibbsSamplingCounter.LIKELIHOOD) / GibbsSamplingTool.RESOLUTION;
         
-        combineModelParam(inputNwz, tmpNwz, outputNwz);
+        combineModelParam(inputNwz, tmpNwz, outputNwz, map, reduce);
         fs.delete(tmpNwz);
         return likelihood;
     }
 
-    private void combineModelParam(Path refNwz, Path inputNwz, Path outputNwz) throws IOException {
-        MapReduceJobConf job = new MapReduceJobConf(getClass());
+    private void combineModelParam(Path refNwz, Path inputNwz, Path outputNwz, int map, int reduce) throws IOException {
+        MapReduceJobConf job = new MapReduceJobConf(getClass(), map, reduce);
         job.setJobName("CombineModelParametersForLDA");
         SequenceFileInputFormat.addInputPath(job, inputNwz);
         SequenceFileInputFormat.addInputPath(job, refNwz);

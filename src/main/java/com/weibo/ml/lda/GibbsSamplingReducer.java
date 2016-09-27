@@ -1,8 +1,10 @@
 package com.weibo.ml.lda;
 
 import com.weibo.tool.FolderReader;
+import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.io.IntWritable;
+import org.apache.hadoop.io.SequenceFile;
 import org.apache.hadoop.io.Text;
 import org.apache.hadoop.mapred.JobConf;
 import org.apache.hadoop.mapred.OutputCollector;
@@ -32,11 +34,21 @@ public class GibbsSamplingReducer implements Reducer<Text, DocumentWritable, Tex
     private int[] nzd = null;
     private int[] nz = null;
     private Random randomProvider = new Random();
-    private double alpha = 0.0D;
-    private double beta = 0.0D;
+    private double alpha = 0.0;
+    private double beta = 0.0;
     private String outputNwz = null;
     private int numWords = 0;
 
+    /**
+     * 用于记录nwz的改变
+     * 1. 当文档分布式的进行处理时，每个reducer都会维护一份全局的nwz
+     * 2. 多份文档同时包含一个word但却分在不同reducer处理时，每个word都会
+     * 在其reducer上进行重新主题分配，此时它维护的一份全局的nwz得到的改变不
+     * 是全局的，而是部分的
+     * 3. 因此设置delta_nwz，存储一个word部分的改变量，reducer结束后将其
+     * 写入磁盘，再通过一个MapReduce任务，将所有的改变量汇总叠加，得到一个
+     * word最后的改变量，即新的nwz
+     */
     private int[][] delta_nwz = null;
 
     public void configure(JobConf conf) {
@@ -51,8 +63,8 @@ public class GibbsSamplingReducer implements Reducer<Text, DocumentWritable, Tex
         //某个主题得到的分配到其下的词的数目
         this.nz = new int[this.numTopics];
         this.outputNwz = conf.get("output.nwz");
-        this.alpha = conf.getFloat("alpha", 0.0F);
-        this.beta = conf.getFloat("beta", 0.0F);
+        this.alpha = (double) conf.getFloat("alpha", 0.0F);
+        this.beta = (double) conf.getFloat("beta", 0.0F);
         try {
             loadModelParameters(conf.get("input.nwz"));
         } catch (IOException e) {
@@ -101,8 +113,7 @@ public class GibbsSamplingReducer implements Reducer<Text, DocumentWritable, Tex
 
     public void reduce(Text key, Iterator<DocumentWritable> values, OutputCollector<Text, DocumentWritable> outputCollector, Reporter reporter) throws IOException {
         while (values.hasNext()) {
-            //long begin = System.nanoTime();
-            DocumentWritable doc = (DocumentWritable) values.next();
+            DocumentWritable doc = values.next();
             computeNzd(doc, this.nzd);
             double likelihood = 0.0;
             int doc_length = doc.getNumWords();
@@ -111,30 +122,28 @@ public class GibbsSamplingReducer implements Reducer<Text, DocumentWritable, Tex
                 int topic = doc.topics[i];
                 int word = doc.words[i];
 
-                this.nzd[topic] -= 1;
-                this.nz[topic] -= 1;
-                this.nwz[word][topic] -= 1;
-                delta_nwz[word][topic] -= 1;
+                this.nzd[topic]--;
+                this.nz[topic]--;
+                this.nwz[word][topic]--;
+                delta_nwz[word][topic]--;
 
                 likelihood += computeSamplingProbability(this.nzd, word, this.probs, this.alpha, this.beta, doc_length - 1);
                 topic = sampleInDistribution(this.probs, this.randomProvider);
 
                 doc.topics[i] = topic;
-                this.nzd[topic] += 1;
-                this.nz[topic] += 1;
-                this.nwz[word][topic] += 1;
-                this.delta_nwz[word][topic] += 1;
+                this.nzd[topic]++;
+                this.nz[topic]++;
+                this.nwz[word][topic]++;
+                this.delta_nwz[word][topic]++;
 
             }
-            //long end1 = System.nanoTime();
-            //LOG.info("1: " + (end1 - begin));
             /**
-             * 此处乘以100，是为了使likelihood得到一个非零数字
-             * 按原来代码的话，强转成long后永远都是0，likelihood失去意义
+             * likelihood值可以调节
+             * likelihood * GibbsSamplingTool.RESOLUTION 使得值过小，因此直接增加likelihood
              */
             reporter.incrCounter(
                     GibbsSamplingTool.GibbsSamplingCounter.LIKELIHOOD,
-                    (long) (likelihood /* / doc.getNumWords() */ * GibbsSamplingTool.RESOLUTION * 100));
+                    (long) likelihood);
             outputCollector.collect(key, doc);
         }
     }
@@ -158,14 +167,15 @@ public class GibbsSamplingReducer implements Reducer<Text, DocumentWritable, Tex
     }
 
     private double computeSamplingProbability(int[] nzd, int word, double[] probs, double alpha, double beta, int doc_length) {
-        Arrays.fill(probs, 0.0D);
-        double norm = 0.0D;
-        double dummyNorm = 1.0D;
-        double likelihood = 0.0D;
+        Arrays.fill(probs, 0.0);
+        double norm = 0.0;
+        //遗留代码，之前替换pzd的分母
+        double dummyNorm = 1.0;
+        double likelihood = 0.0;
         for (int i = 0; i < this.numTopics; i++) {
             //word这个词在第i个topic下的概率
             double pwz = (this.nwz[word][i] + beta) / (this.nz[i] + this.nwz.length * beta);
-            //第i个主题在改文档下的概率
+            //第i个主题在该文档下的概率
             double pzd = (nzd[i] + alpha) / (doc_length + this.numTopics * alpha);
             //该文档选中该主题的概率
             probs[i] = (pwz * pzd);
@@ -178,7 +188,6 @@ public class GibbsSamplingReducer implements Reducer<Text, DocumentWritable, Tex
         return likelihood;
     }
 
-
     /**
      * 计算当前文档的主题分布
      * 方法为统计该文档的每个词被分到的主题，累加后得到该文档的主题分布
@@ -188,11 +197,38 @@ public class GibbsSamplingReducer implements Reducer<Text, DocumentWritable, Tex
     public void computeNzd(DocumentWritable doc, int[] nzd) {
         Arrays.fill(nzd, 0);
         for (int i = 0; i < doc.getNumWords(); i++) {
-            nzd[doc.topics[i]] += 1;
+            nzd[doc.topics[i]]++;
         }
     }
 
-    public void close() throws IOException {
+    public void saveModelParameters(String modelParamPart) throws IOException {
+        long startTime = System.currentTimeMillis();
+        JobConf envConf = new JobConf();
+        SequenceFile.Writer writer = SequenceFile.createWriter(
+                FileSystem.get(envConf),
+                envConf,
+                new Path(modelParamPart),
+                IntWritable.class,
+                WordInfoWritable.class
+        );
+        IntWritable key = new IntWritable();
+        WordInfoWritable value = new WordInfoWritable(numTopics);
+        for (int i = 0; i < nwz.length; i++) {
+            key.set(i);
+            for (int j = 0; j < numTopics; j++) {
+                value.setTopicCount(j, delta_nwz[i][j]);
+            }
+            value.setIsPartial(true);
+            writer.append(key, value);
+        }
+        writer.close();
+        long duration = System.currentTimeMillis() - startTime;
+        LOG.info("Save model parameters using " + duration + " milliseconds.");
+    }
 
+    public void close() throws IOException {
+        //此处的nextInt是个伪随机数
+        String partName = "part-" + Math.abs(randomProvider.nextInt());
+        saveModelParameters(outputNwz + "/" + partName);
     }
 }

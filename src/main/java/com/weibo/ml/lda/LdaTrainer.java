@@ -46,7 +46,8 @@ public class LdaTrainer implements GenericTool {
         flags.addWithDefaultValue("max_num_words", "100000", "max number of words to use, sorted by TF*IDF. [default 100000]");
         flags.addWithDefaultValue("min_df", "5", "words appear in less than min_df documents will be ignored. [default 5]");
         flags.addWithDefaultValue("input_format", "text", "'sequecefile': Text value of each entry is the doc. 'text': each line is a doc. [default 'text']");
-
+        flags.addWithDefaultValue("map_num", "48", "overall number of map container");
+        flags.addWithDefaultValue("reduce_num", "40", "overall number of reduce container");
         flags.parseAndCheck(args);
 
         Path input = new Path(flags.getString("input"));
@@ -62,6 +63,9 @@ public class LdaTrainer implements GenericTool {
         int iterationToKeep = flags.getInt("iterations_to_keep");
         int maxNumWords = flags.getInt("max_num_words");
         int minDf = flags.getInt("min_df");
+
+        int map = flags.getInt("map_num");
+        int reduce = flags.getInt("reduce_num");
 
         JobConf conf = new JobConf();
 
@@ -83,7 +87,9 @@ public class LdaTrainer implements GenericTool {
 
         // Create likelihood file.
         OutputStreamWriter likelihoodWriter = new OutputStreamWriter(
-                fs.create(new Path(workingDir, "likelihood"), true), "UTF-8");
+                fs.create(new Path(workingDir, "likelihood"), true),
+                "UTF-8"
+        );
         likelihoodWriter.close();
 
         /**
@@ -141,9 +147,9 @@ public class LdaTrainer implements GenericTool {
         }
         // 2. 初始化参数及模型
         if (latest == -1) {//这里一个思想很好：未初始化为-1，初始化后为0，之后递增，意义清晰
-            initializer.makeWordList(input, tfdf);
+            initializer.makeWordList(input, tfdf, map, reduce);
             numWords = initializer.selectWords(tfdf, words, maxNumWords, minDf);
-            initializer.initModel(input, docs0, nwz0, words, numTopics, numWords);
+            initializer.initModel(input, docs0, nwz0, words, numTopics, numWords, map, reduce);
             latest = 0;
             logAndShow("Doc initialized.");
         } else {
@@ -159,8 +165,9 @@ public class LdaTrainer implements GenericTool {
             double likelihood = sampler.sampling(
                     previousDocs, targetDocs,
                     previousNwz, targetNwz,
-                    alpha, beta, numTopics, numWords);
-            logAndShow("#" + i + " Likelihood: " + likelihood);
+                    alpha, beta, numTopics, numWords,
+                    map, reduce);
+            logAndShow("#" + (i + 1) + " Likelihood: " + likelihood);
             likelihoodWriter = new OutputStreamWriter(
                     fs.create(new Path(workingDir, "likelihood"), true),
                     "UTF-8");
@@ -191,7 +198,7 @@ public class LdaTrainer implements GenericTool {
 
         long endTime = System.currentTimeMillis();
         DecimalFormat decimalFormat = new DecimalFormat("0.0");
-        String duration_hour = decimalFormat.format((this.startTime - endTime) / 3600.0 / 1000.0);
+        String duration_hour = decimalFormat.format((endTime - this.startTime) / 3600.0 / 1000.0);
         logAndShow("Training time consuming: " + duration_hour + " hours.");
     }
 

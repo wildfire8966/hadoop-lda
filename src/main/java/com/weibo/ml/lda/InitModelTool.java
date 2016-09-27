@@ -13,6 +13,7 @@ import org.apache.hadoop.io.IntWritable;
 import org.apache.hadoop.io.Text;
 import org.apache.hadoop.mapred.JobClient;
 import org.apache.hadoop.mapred.JobConf;
+import org.apache.hadoop.mapred.Reducer;
 import org.apache.hadoop.mapred.lib.IdentityMapper;
 
 import java.io.IOException;
@@ -36,15 +37,19 @@ public class InitModelTool implements GenericTool {
         flags.add("wordlist");
         flags.add("max_num_words");
         flags.add("min_df");
+        flags.add("map_num");
+        flags.add("reduce_num");
         flags.parseAndCheck(args);
 
         Path input = new Path(flags.getString("input"));
         Path tfdf = new Path("tfdf");
         Path wordlist = new Path(flags.getString("wordlist"));
+        int map = flags.getInt("map_num");
+        int reduce = flags.getInt("reduce_num");
         int maxNumWords = flags.getInt("max_num_words");
         int minDf = flags.getInt("min_df");
 
-        makeWordList(input, tfdf);
+        makeWordList(input, tfdf, map, reduce);
 
         int numWords = selectWords(tfdf, wordlist, maxNumWords, minDf);
 
@@ -54,7 +59,8 @@ public class InitModelTool implements GenericTool {
                 new Path(flags.getString("output_nwz")),
                 wordlist,
                 flags.getInt("num_topics"),
-                numWords);
+                numWords,
+                map,reduce);
 
     }
 
@@ -177,8 +183,8 @@ public class InitModelTool implements GenericTool {
      * @param output
      * @throws IOException
      */
-    public void makeWordList(Path input, Path output) throws IOException {
-        MapReduceJobConf job = new MapReduceJobConf(this.getClass());
+    public void makeWordList(Path input, Path output, int map, int reduce) throws IOException {
+        MapReduceJobConf job = new MapReduceJobConf(this.getClass(), map, reduce);
         job.setJobName("EstimateWordFreqForLDA");
         job.setMapReduce(WordListMapper.class, WordListReducer.class);
         job.setCombinerClass(WordListCombiner.class);
@@ -187,7 +193,11 @@ public class InitModelTool implements GenericTool {
         JobClient.runJob(job);
     }
 
-    public void initModel(Path input, Path outputDocs, Path outputNwz, Path wordlist, int numTopics, int numWords)
+    public void initModel(
+            Path input, Path outputDocs,
+            Path outputNwz, Path wordlist,
+            int numTopics, int numWords,
+            int map, int reduce)
         throws IOException
     {
         JobConf envConf = new JobConf();
@@ -197,7 +207,7 @@ public class InitModelTool implements GenericTool {
         Path tmpNwz = new Path(outputNwz + "_tmp").makeQualified(fs);
         wordlist = wordlist.makeQualified(fs);
 
-        MapReduceJobConf job = new MapReduceJobConf(this.getClass());
+        MapReduceJobConf job = new MapReduceJobConf(this.getClass(), map, reduce);
         FileSystem.get(job).mkdirs(tmpNwz);
         job.setJobName("InitializeModelForLDA");
         job.setMapReduce(InitModelMapper.class, InitModelReducer.class);
@@ -211,13 +221,13 @@ public class InitModelTool implements GenericTool {
         job.setInt("num.words", numWords);
         JobClient.runJob(job);
 
-        combineModelParm(tmpNwz, outputNwz);
+        combineModelParm(tmpNwz, outputNwz, map, reduce);
         fs.delete(tmpNwz);
         System.out.println("Done");
     }
 
-    private void combineModelParm(Path tmpNwz, Path outputNwz) throws IOException {
-        MapReduceJobConf job = new MapReduceJobConf(getClass());
+    private void combineModelParm(Path tmpNwz, Path outputNwz, int map, int reduce) throws IOException {
+        MapReduceJobConf job = new MapReduceJobConf(getClass(), map, reduce);
         job.setJobName("CombineModelParametersForLDA");
         job.setInputOutputPath(tmpNwz, outputNwz);
         job.setMapReduce(IdentityMapper.class, CombineModelParamReducer.class);

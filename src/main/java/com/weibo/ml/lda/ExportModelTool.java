@@ -33,7 +33,6 @@ public class ExportModelTool implements GenericTool {
     protected int numTopics;
     protected double alpha;
     protected double beta;
-    protected String[] explainations;
     protected Map<Integer, String> wordIds;
 
     public void run(String[] args) throws Exception {
@@ -99,8 +98,6 @@ public class ExportModelTool implements GenericTool {
 
         LOG.info("Load model parameters, alpha:" + this.alpha + " beta:" + this.beta + " num_topics:" + this.numTopics);
 
-        this.explainations = new String[this.numTopics];
-
         Path[] files = { modelPath };
         FileStatus[] modelFiles = fs.listStatus(files, new PathFilter() {
             public boolean accept(Path path) {
@@ -128,7 +125,6 @@ public class ExportModelTool implements GenericTool {
         IntWritable word = new IntWritable();
         WordInfoWritable topicCounts = new WordInfoWritable();
         FolderReader reader = new FolderReader(input);
-        int n = 0;
         while (reader.next(word, topicCounts)) {
             int[] counts = this.nwz[word.get()];
             if (counts == null) {
@@ -139,7 +135,6 @@ public class ExportModelTool implements GenericTool {
             for (int i = 0; i < this.numTopics; i++) {
                 counts[i] += topicCounts.getTopicCount(i);
             }
-            n++;
         }
         reader.close();
     }

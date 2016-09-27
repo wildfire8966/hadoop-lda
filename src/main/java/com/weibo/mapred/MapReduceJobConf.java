@@ -10,19 +10,27 @@ import org.apache.hadoop.mapred.*;
  * Created by yuanye8 on 16/9/6.
  */
 public class MapReduceJobConf extends JobConf {
-    public MapReduceJobConf() {
+    public MapReduceJobConf(int mapTaskNum, int reduceTaskNum) {
         setInputFormat(SequenceFileInputFormat.class);
         setOutputFormat(SequenceFileOutputFormat.class);
-        setNumMapTasks(48);
-        setNumReduceTasks(40);
+        if (mapTaskNum <= 0 || reduceTaskNum <= 0) {
+            mapTaskNum = 48;
+            reduceTaskNum = 40;
+        }
+        setNumMapTasks(mapTaskNum);
+        setNumReduceTasks(reduceTaskNum);
     }
 
-    public MapReduceJobConf(Class jobClass) {
+    public MapReduceJobConf(Class jobClass, int mapTaskNum, int reduceTaskNum) {
         super(jobClass);
         setInputFormat(SequenceFileInputFormat.class);
         setOutputFormat(SequenceFileOutputFormat.class);
-        setNumMapTasks(48);
-        setNumReduceTasks(40);
+        if (mapTaskNum <= 0 || reduceTaskNum <= 0) {
+            mapTaskNum = 48;
+            reduceTaskNum = 40;
+        }
+        setNumMapTasks(mapTaskNum);
+        setNumReduceTasks(reduceTaskNum);
     }
 
     public void setKeyValueClass(Class<? extends WritableComparable> keyMerge,

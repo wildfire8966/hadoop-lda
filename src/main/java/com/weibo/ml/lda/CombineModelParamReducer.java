@@ -12,12 +12,15 @@ import java.util.Iterator;
 
 /**
  * Combine the word topic counts from different samplers.
+ * referenceCount的由来详见GibbsSamplingReducer中delta_nwz的注释
  * Created by yuanye8 on 16/9/7.
  */
 public class CombineModelParamReducer implements Reducer<IntWritable, WordInfoWritable, IntWritable, WordInfoWritable> {
+    //用于记录本次计算的delta_nwz结果，是多个reducer的数据按key shuffle后的结果
     private int[] topicCount = null;
-    //此处无实际用处，原代码遗留
+    //用于记录上次计算的nwz结果
     private int[] referenceCount = null;
+    //用于输出本地迭代最终的nwz结果
     private WordInfoWritable outvalue = null;
     //暂无实际用处
     private boolean takeMean = true;
@@ -40,10 +43,14 @@ public class CombineModelParamReducer implements Reducer<IntWritable, WordInfoWr
                 Arrays.fill(this.referenceCount, 0);
             }
             if (v.isPartial) {
+                //来自多个reducer的delta_nwz汇总
                 for (int i = 0; i < v.size(); i++) {
                     this.topicCount[i] += v.getTopicCount(i);
                 }
             } else {
+                /**
+                 * 来自上次计算的结果，第一次初始化数据时，referenceCount全部为0
+                 */
                 for (int i = 0; i < v.size(); i++) {
                     this.referenceCount[i] += v.getTopicCount(i);
                 }
@@ -59,7 +66,6 @@ public class CombineModelParamReducer implements Reducer<IntWritable, WordInfoWr
     }
 
     public void close() throws IOException {
-
     }
 
 }
