@@ -13,9 +13,11 @@ public class ShowTopics implements com.weibo.tool.GenericTool {
     public void run(String[] args) throws Exception {
         Flags flags = new Flags();
         flags.add("model", "LDA model file");
+        flags.add("top_n", "Number of words describe certain topic");
         flags.parseAndCheck(args);
 
         LdaModel model = new LdaModel();
+        int top_n = flags.getInt("top_n");
         model.loadModel(flags.getString("model"));
         AnyDoublePair<Integer> [] topics = new AnyDoublePair[model.getNumTopics()];
 
@@ -32,8 +34,8 @@ public class ShowTopics implements com.weibo.tool.GenericTool {
         });
 
         for (int i = 0; i < topics.length; i++) {
-            System.out.println(topics[i].first + " " + topics[i].second + " " +
-                    model.explain(topics[i].first.intValue(), 100));
+            System.out.println("topic_" + topics[i].first + " Proportion:" + topics[i].second);
+            System.out.println(model.explain(topics[i].first.intValue(), top_n));
         }
     }
 }

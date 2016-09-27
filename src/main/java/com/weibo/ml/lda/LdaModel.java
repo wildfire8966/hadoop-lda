@@ -3,7 +3,6 @@ package com.weibo.ml.lda;
 import com.weibo.io.GzipTextFileReader;
 import com.weibo.io.TextFileReader;
 import com.weibo.tool.StringUtil;
-import sun.jvm.hotspot.debugger.win32.coff.Characteristics;
 
 import java.io.IOException;
 import java.util.ArrayList;
@@ -17,17 +16,45 @@ import java.util.logging.Logger;
  * Created by yuanye8 on 16/9/26.
  */
 public class LdaModel {
+
     protected static Logger LOG = Logger.getLogger(LdaModel.class.getName());
+
+    /**
+     * 训练模型导入，int数组加了一列，为前K列的总和，即某个词共被分配到K个主题下的总次数
+     */
     protected Hashtable<String, int[]> nwz = new Hashtable<String, int[]>();
+
+    /**
+     * 所有词被分配到K个主题下的次数分布
+     */
     protected int[] topicSum;
+
+    /**
+     * K个主题下的次数分布的总和，相当于topicSum所有元素之和
+     */
     protected int totalSum;
+
     protected int numTopics;
+
     protected double alpha;
+
     protected double beta;
+
+    /**
+     * 相当于iterations_to_keep
+     */
     protected int n;
+
+    /**
+     * 描述K个主题，每个数组元素是一串n个词组成的字符串
+     */
     protected String[] explainations;
+
     protected ArrayList<String> words = new ArrayList<String>();
 
+    /**
+     * 文档被分配到n个主题下的次数，长度K，即numTopics
+     */
     protected int[] ndz;
     protected Random random = new Random();
 
@@ -39,8 +66,16 @@ public class LdaModel {
         return dist;
     }
 
+    /**
+     *
+     * @param words 文档切词后输入
+     * @param pz 文档主题概率分布
+     * @param numBurnInIterations
+     * @param numSamplingIterations
+     */
     private void inference(String[] words, double[] pz, int numBurnInIterations, int numSamplingIterations) {
         words = removeUnknownWords(words);
+        //每个词的主题
         int[] z = new int[words.length];
 
         for (int i = 0; i < numTopics; i++) {
@@ -51,9 +86,13 @@ public class LdaModel {
             ndz[z[i]]++;
         }
 
-
     }
 
+    /**
+     * Only keep words in vocabulary for inference.
+     * @param words
+     * @return
+     */
     private String[] removeUnknownWords(String[] words) {
         ArrayList<String>  features = new ArrayList<String>();
         for (String word : words) {
@@ -64,7 +103,11 @@ public class LdaModel {
         return features.toArray(new String[0]);
     }
 
-    //模拟随机选择主题
+    /**
+     * Mock random choose topic.
+     * @param dist
+     * @return
+     */
     protected int sampleInDistribution(double[] dist) {
         double p = random.nextDouble();
         double sum = 0;
@@ -77,6 +120,12 @@ public class LdaModel {
         return dist.length - 1;
     }
 
+    /**
+     * Describe certain "topic n" with words of specified number most likely under it.
+     * @param topic
+     * @param top_n max number of words to describe a topic
+     * @return
+     */
     public String explain(int topic, int top_n) {
         if (explainations[topic] == null) {
             String[] words = new String[top_n];
@@ -86,11 +135,12 @@ public class LdaModel {
                 counts = entry.getValue();
                 //词word_n对topic_n的贡献 / 所有词对topic_n的贡献
                 double pwz = (counts[topic] + n * beta) / (topicSum[topic] + n * beta * nwz.size());
-                //词word_n对该topic_n的贡献 / 词word_n对所有topic的贡献， 越大越好
+                //词word_n对该topic_n的贡献 / 词word_n对所有topic的贡献
                 double pzw = (counts[topic] + n * beta) / (counts[numTopics] + n * beta * numTopics);
+                //最终评价值：值越大，表示该词在此topic下的可能性越大
                 double characteristic = Math.log(pwz + 1.0) * pzw;
 
-                //取top_n
+                //取top_n, 采用插入排序法
                 for (int i = 0; i < top_n; i++) {
                     if (characteristic > values[i]) {
                         for (int m = top_n - 2; m >= i && m >= 0; m--) {
@@ -111,6 +161,13 @@ public class LdaModel {
         return explainations[topic];
     }
 
+    /**
+     * Loading nwz file, calculate total number of
+     * each word assigned to certain topic and total
+     * number of all words assigned to topics.
+     * @param model
+     * @throws IOException
+     */
     public void loadModel(String model) throws IOException {
         nwz.clear();
         TextFileReader reader = null;
@@ -148,7 +205,7 @@ public class LdaModel {
 
         LOG.info("Load model parameters, alpha:" + alpha + " beta:" + beta +
                 " num_topics:" + numTopics + " num_words:" + nwz.size() +
-                " iterations:" + n);
+                " iterations:" + n + " totalSum:" + totalSum);
 
         explainations = new String[numTopics];
         ndz = new int[numTopics];
@@ -157,10 +214,14 @@ public class LdaModel {
     /**
      * 某一主题在所有主题中占比程度
      * @param i
-     * @return 返回值：某一主题总次数 / 所有主题总次数
+     * @return 返回值：单词背分到某一主题的总次数 / 单词被分到所有主题的总次数
      */
     public double pz(int topic) {
-        return topicSum[topic] / totalSum;
+        return topicSum[topic] / (double)totalSum;
+    }
+
+    public String getWord(int i) {
+        return words.get(i);
     }
 
     public int getNumTopics() {
@@ -169,10 +230,6 @@ public class LdaModel {
 
     public int getNumWords() {
         return words.size();
-    }
-
-    public String getWord(int i) {
-        return words.get(i);
     }
 
     public int getNumTrainingIterations() {
