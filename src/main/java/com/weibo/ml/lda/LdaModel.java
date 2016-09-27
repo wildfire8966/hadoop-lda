@@ -62,6 +62,7 @@ public class LdaModel {
 
     public double[] inference(String[] words) {
         double[] dist = new double[numTopics];
+        //30,10
         inference(words, dist, 30, 10);
         return dist;
     }
@@ -77,7 +78,6 @@ public class LdaModel {
      */
     private void inference(String[] words, double[] pz, int numBurnInIterations, int numSamplingIterations) {
         words = removeUnknownWords(words);
-        System.out.println(words.length);
         //每个词的主题
         int[] z = new int[words.length];
 

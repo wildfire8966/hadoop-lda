@@ -3,7 +3,9 @@ import sys, math
 import time
 import datetime
 
-
+'''
+此文件对训练处的模型进行变换，根据变换后形成的文件进行新文档的预测
+'''
 if __name__=='__main__':
 	for line in sys.stdin:
 		v = line.strip().split(' ')
@@ -13,7 +15,7 @@ if __name__=='__main__':
 		topic_count = {}
 		for i in range(1, len(v)):
 			#print int(v[i])
-			if v[i] == '0':
+			if int(v[i]) <= 0:
 				continue
 			sum += int(v[i])
 			topic_count[i - 1] = int(v[i])
