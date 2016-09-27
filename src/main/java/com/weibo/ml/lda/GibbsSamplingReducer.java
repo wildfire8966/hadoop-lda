@@ -137,13 +137,10 @@ public class GibbsSamplingReducer implements Reducer<Text, DocumentWritable, Tex
                 this.delta_nwz[word][topic]++;
 
             }
-            /**
-             * likelihood值可以调节
-             * likelihood * GibbsSamplingTool.RESOLUTION 使得值过小，因此直接增加likelihood
-             */
+
             reporter.incrCounter(
                     GibbsSamplingTool.GibbsSamplingCounter.LIKELIHOOD,
-                    (long) likelihood);
+                    (long) (likelihood * GibbsSamplingTool.RESOLUTION));
             outputCollector.collect(key, doc);
         }
     }

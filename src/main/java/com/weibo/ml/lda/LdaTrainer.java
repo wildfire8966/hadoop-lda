@@ -228,7 +228,12 @@ public class LdaTrainer implements GenericTool {
         job.setReducerClass(CombineTassignReducer.class);
 
         SequenceFileInputFormat.addInputPath(job, originalDocs);
-        FileOutputFormat.setOutputPath(job, new Path(originalDocs.getParent(), "tassign"));
+        Path tassignPath = new Path(originalDocs.getParent(), "tassign");
+        FileOutputFormat.setOutputPath(job, tassignPath);
+
+        if (fs.exists(tassignPath)) {
+            fs.delete(tassignPath);
+        }
 
         RunningJob runningJob = JobClient.runJob(job);
         runningJob.waitForCompletion();

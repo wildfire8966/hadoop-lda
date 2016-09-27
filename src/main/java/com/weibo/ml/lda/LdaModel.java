@@ -67,17 +67,21 @@ public class LdaModel {
     }
 
     /**
+     * inference method one, long time consuming
+     * remove no-relation words first， not concern every words effection
      *
-     * @param words 文档切词后输入
-     * @param pz 文档主题概率分布
+     * @param words                 文档切词后输入
+     * @param pz                    文档主题概率分布
      * @param numBurnInIterations
      * @param numSamplingIterations
      */
     private void inference(String[] words, double[] pz, int numBurnInIterations, int numSamplingIterations) {
         words = removeUnknownWords(words);
+        System.out.println(words.length);
         //每个词的主题
         int[] z = new int[words.length];
 
+        //初始化每个文档主题分布 及 随机初始化每个词的主题
         for (int i = 0; i < numTopics; i++) {
             ndz[i] = 0;
         }
@@ -86,17 +90,108 @@ public class LdaModel {
             ndz[z[i]]++;
         }
 
+        // Burn-in.
+        for (int i = 0; i < numBurnInIterations; i++) {
+            for (int j = 0; j < words.length; j++) {
+                int oldTopic = z[j];
+                --ndz[oldTopic];
+                calculateConditionalProbability(words[j], ndz, pz, words.length);
+                int newTopic = sampleInDistribution(pz);
+                z[j] = newTopic;
+                ++ndz[newTopic];
+            }
+        }
+
+        // Inference.
+        for (int i = 0; i < numSamplingIterations; i++) {
+            for (int j = 0; j < words.length; j++) {
+                calculateConditionalProbability(words[j], ndz, pz, words.length);
+                int newTopic = sampleInDistribution(pz);
+                z[j] = newTopic;
+                ++ndz[newTopic];
+            }
+        }
+
+        double norm = 0.0;
+        for (int i = 0; i < pz.length; i++) {
+            pz[i] = ndz[i] + alpha;
+            norm += pz[i];
+        }
+        for (int i = 0; i < pz.length; i++) {
+            pz[i] /= norm;
+        }
+
+    }
+
+    /**
+     * 计算新来文档的其中一个词在各主题下的概率分布
+     *
+     * @param word
+     * @param ndz
+     * @param pz
+     * @param doclength
+     */
+    private void calculateConditionalProbability(String word, int[] ndz, double[] pz, int doclength) {
+        int[] counts = nwz.get(word);
+        double sum = 0.0;
+        double normalizer = (doclength + numTopics * alpha - 1);
+        for (int i = 0; i < numTopics; i++) {
+            pz[i] = (counts[i] + beta) / (ndz[i] + nwz.size() * beta - 1) * (ndz[i] + alpha) / normalizer;
+            sum += pz[i];
+        }
+        for (int i = 0; i < numTopics; i++) {
+            pz[i] /= sum;
+        }
+    }
+
+    public double[] inferenceFast(String[] doc) {
+        double[] p = new double[numTopics];
+        inferenceFast(doc, p);
+        return p;
+    }
+
+    /**
+     * inference method two, execute fast
+     * concern every words effection
+     *
+     * @param doc
+     * @param p
+     */
+    private void inferenceFast(String[] doc, double[] p) {
+        for (int i = 0; i < numTopics; i++) {
+            p[i] = 0.0;
+        }
+        for (int i = 0; i < doc.length; i++) {
+            //遍历每个单词，计算每个单词对每个主题的贡献
+            int[] counts = nwz.get(doc[i]);
+            for (int k = 0; k < numTopics; k++) {
+                if (counts == null) {
+                    p[k] += LdaModel.LOG_MIN_PROB;
+                } else {
+                    p[k] += Math.log((counts[k] + n * beta) / (topicSum[k] + n * beta * nwz.size()));
+                }
+            }
+        }
+        double norm = 0.0;
+        for (int i = 0; i < numTopics; i++) {
+            norm += Math.exp(p[i]);
+        }
+        for (int i = 0; i < numTopics; i++) {
+            p[i] = Math.exp(p[i]) / norm;
+        }
     }
 
     /**
      * Only keep words in vocabulary for inference.
+     *
      * @param words
      * @return
      */
     private String[] removeUnknownWords(String[] words) {
-        ArrayList<String>  features = new ArrayList<String>();
+        ArrayList<String> features = new ArrayList<String>();
         for (String word : words) {
-            if (nwz.contains(word)) {
+            //contains() are same like containsValue()
+            if (nwz.containsKey(word)) {
                 features.add(word);
             }
         }
@@ -105,13 +200,14 @@ public class LdaModel {
 
     /**
      * Mock random choose topic.
+     *
      * @param dist
      * @return
      */
     protected int sampleInDistribution(double[] dist) {
         double p = random.nextDouble();
         double sum = 0;
-        for (int i = 0 ; i < dist.length; i++) {
+        for (int i = 0; i < dist.length; i++) {
             sum += dist[i];
             if (sum >= p) {
                 return i;
@@ -122,6 +218,7 @@ public class LdaModel {
 
     /**
      * Describe certain "topic n" with words of specified number most likely under it.
+     *
      * @param topic
      * @param top_n max number of words to describe a topic
      * @return
@@ -147,8 +244,8 @@ public class LdaModel {
                             if (values[m] == 0.0) {
                                 continue;
                             }
-                            words[m+1] = words[m];
-                            values[m+1] = values[m];
+                            words[m + 1] = words[m];
+                            values[m + 1] = values[m];
                         }
                         words[i] = entry.getKey();
                         values[i] = characteristic;
@@ -165,6 +262,7 @@ public class LdaModel {
      * Loading nwz file, calculate total number of
      * each word assigned to certain topic and total
      * number of all words assigned to topics.
+     *
      * @param model
      * @throws IOException
      */
@@ -187,11 +285,11 @@ public class LdaModel {
         String line;
         while ((line = reader.readLine()) != null) {
             String[] cols = line.split(" ");
-            assert(cols.length == numTopics + 1);
+            assert (cols.length == numTopics + 1);
             int[] counts = new int[numTopics + 1];
             int sum = 0;
             for (int i = 0; i < numTopics; i++) {
-                counts[i] = Integer.parseInt(cols[i+1]);
+                counts[i] = Integer.parseInt(cols[i + 1]);
                 topicSum[i] += counts[i];
                 sum += counts[i];
             }
@@ -213,11 +311,12 @@ public class LdaModel {
 
     /**
      * 某一主题在所有主题中占比程度
-     * @param i
+     *
+     * @param topic
      * @return 返回值：单词背分到某一主题的总次数 / 单词被分到所有主题的总次数
      */
     public double pz(int topic) {
-        return topicSum[topic] / (double)totalSum;
+        return topicSum[topic] / (double) totalSum;
     }
 
     public String getWord(int i) {
