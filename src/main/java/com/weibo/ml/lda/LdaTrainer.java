@@ -98,6 +98,27 @@ public class LdaTrainer implements GenericTool {
          */
         NumberFormat formatter = new DecimalFormat("00000");
         Path[] paths = { workingDir };
+
+        //检查是否有_tmp结尾的文件，如果有，当次迭代失败，先删除旧数据
+        FileStatus[] tmpFiles = fs.listStatus(paths, new PathFilter() {
+            public boolean accept(Path p) {
+                return p.getName().endsWith("_tmp");
+            }
+        });
+        for (FileStatus f : tmpFiles) {
+            int dot = f.getPath().getName().indexOf(".");
+            int n = Integer.parseInt(f.getPath().getName().substring(dot + 1, dot + 1 + 5));
+            if (fs.exists(f.getPath())) {
+                fs.delete(f.getPath());
+                LOG.info("delete old uncomplete data : " + f.getPath().getName());
+            }
+            Path docPath = new Path(f.getPath().getParent() + "/" + "docs." + formatter.format(n));
+            if (fs.exists(docPath)) {
+                fs.delete(docPath);
+                LOG.info("delete pair file : " + docPath + "too.");
+            }
+        }
+
         FileStatus[] existNwz = fs.listStatus(paths, new PathFilter() {
             public boolean accept(Path p) {
                 logAndShow("Previous data:" + p.getName());
