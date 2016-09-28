@@ -143,50 +143,7 @@ public class LdaModel {
             pz[i] /= sum;
         }
     }
-
-    public double[] inferenceFast(String[] doc) {
-        double[] p = new double[numTopics];
-        inferenceFast(doc, p);
-        return p;
-    }
-
-    /**
-     * inference method two, execute fast
-     * concern every words effection
-     *
-     * @param doc
-     * @param p
-     */
-    private void inferenceFast(String[] doc, double[] p) {
-        for (int i = 0; i < numTopics; i++) {
-            p[i] = 0.0;
-        }
-        for (int i = 0; i < doc.length; i++) {
-            //遍历每个单词，计算每个单词对每个主题的贡献
-            int[] counts = nwz.get(doc[i]);
-            for (int k = 0; k < numTopics; k++) {
-                if (counts == null) {
-                    p[k] += LdaModel.LOG_MIN_PROB;
-                } else {
-                    System.out.println((counts[k] + n * beta) / (topicSum[k] + n * beta * nwz.size()));
-                    p[k] += Math.log((counts[k] + n * beta) / (topicSum[k] + n * beta * nwz.size()));
-                }
-            }
-        }
-        for (double i : p) {
-            System.out.print(i + " ");
-
-        }
-        System.out.println();
-        double norm = 0.0;
-        for (int i = 0; i < numTopics; i++) {
-            norm += Math.exp(p[i]);
-        }
-        for (int i = 0; i < numTopics; i++) {
-            p[i] = Math.exp(p[i]) / norm;
-        }
-    }
-
+    
     /**
      * Only keep words in vocabulary for inference.
      *
@@ -347,6 +304,57 @@ public class LdaModel {
 
     public double getBeta() {
         return beta;
+    }
+
+    @Deprecated
+    public double[] inferenceFast(String[] doc) {
+        double[] p = new double[numTopics];
+        inferenceFast(doc, p);
+        return p;
+    }
+
+    /**
+     * inference method two, execute fast
+     * concern every words effection
+     *
+     * @param doc
+     * @param p
+     */
+    @Deprecated
+    private void inferenceFast(String[] doc, double[] p) {
+        for (int i = 0; i < numTopics; i++) {
+            p[i] = 0.0;
+        }
+
+        for (int i = 0; i < doc.length; i++) {
+            //遍历每个单词，计算每个单词对每个主题的贡献
+            int[] counts = nwz.get(doc[i]);
+            double tmp = 0.0;
+            for (int k = 0; k < numTopics; k++) {
+                if (counts == null) {
+                    p[k] += LdaModel.LOG_MIN_PROB;
+                } else {
+                    if (counts[k] < 0) {
+                        counts[k] = 0;
+                        tmp = (counts[k] + n * beta) / (topicSum[k] + n * beta * nwz.size());
+                    }
+                    if (tmp <= 0) {
+                        LOG.info("[Bad Data]: Math(x), x less than zero, so result can be NaN." + tmp);
+                        continue;
+                    }
+                    p[k] += Math.log(tmp);
+                }
+            }
+        }
+
+        double norm = 0.0;
+        for (int i = 0; i < numTopics; i++) {
+            norm += Math.exp(p[i]);
+        }
+        for (int i = 0; i < numTopics; i++) {
+            p[i] = Math.exp(p[i]) / norm;
+        }
+
     }
 
 }

@@ -1,5 +1,6 @@
 package com.weibo.tool;
 
+import com.weibo.ml.lda.InferenceNewDoc;
 import com.weibo.ml.lda.LdaTrainer;
 import com.weibo.ml.lda.ShowTopics;
 
@@ -9,7 +10,7 @@ import com.weibo.ml.lda.ShowTopics;
 public class EntryPoint {
     public static void main(String[] args) throws Exception {
         if (args.length < 1) {
-            System.out.println("usage: train showModel");
+            System.out.println("usage: train showModel inference");
             return;
         }
 
@@ -24,6 +25,8 @@ public class EntryPoint {
             tool = new LdaTrainer();
         } else if (command.equals("showModel")) {
             tool = new ShowTopics();
+        } else if (command.equals("inference")) {
+            tool = new InferenceNewDoc();
         }
         tool.run(realArgs);
     }
