@@ -17,10 +17,8 @@ public class TestInference {
         String a = "税前 扣除 明白 税前 意思 并入 工资 薪金 所得 缴纳 个人所得税 税前 扣除";
         String b = "注定 伟大 加内特 传奇 巨星 退役 传奇 终结";
         String[] test1 = a.split(" ");
-        for (int i = 0; i < 100; i++) {
-            inferenceDoc(lda, test1);
-        }
-
+        //inferenceDoc(lda, test1);
+        inferenceDocFast(lda, test1);
     }
 
     public static void printProb(double[] p) {
@@ -54,6 +52,9 @@ public class TestInference {
     public static void inferenceDocFast(LdaModel lda, String[] ss) {
         double[] p = lda.inferenceFast(ss);
         System.out.println("inference fast：" + StringUtil.join(ss, " "));
+        for (double n : p) {
+            System.out.print(n + " ");
+        }
         printProb(p);
     }
 

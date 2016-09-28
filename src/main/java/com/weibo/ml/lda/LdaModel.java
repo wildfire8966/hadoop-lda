@@ -168,10 +168,16 @@ public class LdaModel {
                 if (counts == null) {
                     p[k] += LdaModel.LOG_MIN_PROB;
                 } else {
+                    System.out.println((counts[k] + n * beta) / (topicSum[k] + n * beta * nwz.size()));
                     p[k] += Math.log((counts[k] + n * beta) / (topicSum[k] + n * beta * nwz.size()));
                 }
             }
         }
+        for (double i : p) {
+            System.out.print(i + " ");
+
+        }
+        System.out.println();
         double norm = 0.0;
         for (int i = 0; i < numTopics; i++) {
             norm += Math.exp(p[i]);
