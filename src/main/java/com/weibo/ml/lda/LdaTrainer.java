@@ -110,12 +110,17 @@ public class LdaTrainer implements GenericTool {
             int n = Integer.parseInt(f.getPath().getName().substring(dot + 1, dot + 1 + 5));
             if (fs.exists(f.getPath())) {
                 fs.delete(f.getPath());
-                LOG.info("delete old uncomplete data : " + f.getPath().getName());
+                LOG.info("delete old undone data : " + f.getPath().getName() + ".");
             }
             Path docPath = new Path(f.getPath().getParent() + "/" + "docs." + formatter.format(n));
+            Path nwzPath = new Path(f.getPath().getParent() + "/" + "nwz." + formatter.format(n));
+            if (fs.exists(nwzPath)) {
+                fs.delete(nwzPath);
+                LOG.info("delete nwz file : " + nwzPath.getName() + ".");
+            }
             if (fs.exists(docPath)) {
                 fs.delete(docPath);
-                LOG.info("delete pair file : " + docPath + "too.");
+                LOG.info("delete doc file related to nwz file : " + docPath.getName() + ".");
             }
         }
 
